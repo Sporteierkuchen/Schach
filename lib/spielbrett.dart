@@ -1,0 +1,866 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:schach/components/Dialog.dart';
+import 'package:schach/components/Move%20Infos.dart';
+import 'package:schach/components/Schachfigur.dart';
+import 'package:schach/components/feld.dart';
+import 'package:schach/helper/helper.dart';
+import 'package:schach/spielbrett.dart';
+import 'package:schach/values/colors.dart';
+
+import 'components/Enums.dart';
+
+class SpielBrett extends StatefulWidget {
+  const SpielBrett({super.key});
+
+  @override
+  State<SpielBrett> createState() => _SpielBrettState();
+}
+
+class _SpielBrettState extends State<SpielBrett> {
+  late bool figurenfarbe; //false=schwarz true=weiß
+
+  late List<List<Schachfigur?>> brett;
+
+  Schachfigur? ausgewaehlteFigur;
+
+  int selectedRow = -1;
+  int selectedColumn = -1;
+
+  List<List<int>> validMoves = [];
+
+  List<Schachfigur> weisseFigurenRaus = [];
+  List<Schachfigur> schwarzeFigurenRaus = [];
+
+  bool isWhiteTurn = true;
+
+  MoveInfos? moveInfos;
+
+  late List<int> whiteKingPosition;
+  late List<int> blackKingPosition;
+  bool checkStatus = false;
+
+  @override
+  void initState() {
+    figurenfarbe = true;
+    _startSpielbrett();
+  }
+
+  void _startSpielbrett() {
+    List<List<Schachfigur?>> neuesBrett =
+        List.generate(8, (index) => List.generate(8, (index) => null));
+
+    //
+    //          column
+    //
+    //       0 1 2 3 4 5 6 7
+    // row   1
+    //       2
+    //       3
+    //       4
+    //       5
+    //       6
+    //       7
+
+    // for (int i = 0; i < 8; i++) {
+    //   neuesBrett[1][i] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: figurenfarbe ? false : true,
+    //       isEnemy: true);
+    //   neuesBrett[6][i] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: figurenfarbe ? true : false,
+    //       isEnemy: false);
+    // }
+    //
+    // neuesBrett[0][0] = Schachfigur(
+    //     art: Schachfigurenart.TURM,
+    //     istWeiss: figurenfarbe ? false : true,
+    //     isEnemy: true);
+    // neuesBrett[0][7] = Schachfigur(
+    //     art: Schachfigurenart.TURM,
+    //     istWeiss: figurenfarbe ? false : true,
+    //     isEnemy: true);
+    // neuesBrett[7][0] = Schachfigur(
+    //     art: Schachfigurenart.TURM,
+    //     istWeiss: figurenfarbe ? true : false,
+    //     isEnemy: false);
+    // neuesBrett[7][7] = Schachfigur(
+    //     art: Schachfigurenart.TURM,
+    //     istWeiss: figurenfarbe ? true : false,
+    //     isEnemy: false);
+    //
+    // neuesBrett[0][1] = Schachfigur(
+    //     art: Schachfigurenart.SPRINGER,
+    //     istWeiss: figurenfarbe ? false : true,
+    //     isEnemy: true);
+    // neuesBrett[0][6] = Schachfigur(
+    //     art: Schachfigurenart.SPRINGER,
+    //     istWeiss: figurenfarbe ? false : true,
+    //     isEnemy: true);
+    // neuesBrett[7][1] = Schachfigur(
+    //     art: Schachfigurenart.SPRINGER,
+    //     istWeiss: figurenfarbe ? true : false,
+    //     isEnemy: false);
+    // neuesBrett[7][6] = Schachfigur(
+    //     art: Schachfigurenart.SPRINGER,
+    //     istWeiss: figurenfarbe ? true : false,
+    //     isEnemy: false);
+    //
+    // neuesBrett[0][2] = Schachfigur(
+    //     art: Schachfigurenart.LAEUFER,
+    //     istWeiss: figurenfarbe ? false : true,
+    //     isEnemy: true);
+    // neuesBrett[0][5] = Schachfigur(
+    //     art: Schachfigurenart.LAEUFER,
+    //     istWeiss: figurenfarbe ? false : true,
+    //     isEnemy: true);
+    // neuesBrett[7][2] = Schachfigur(
+    //     art: Schachfigurenart.LAEUFER,
+    //     istWeiss: figurenfarbe ? true : false,
+    //     isEnemy: false);
+    // neuesBrett[7][5] = Schachfigur(
+    //     art: Schachfigurenart.LAEUFER,
+    //     istWeiss: figurenfarbe ? true : false,
+    //     isEnemy: false);
+    //
+    // if (figurenfarbe) {
+    //   neuesBrett[0][3] = Schachfigur(
+    //       art: Schachfigurenart.DAME, istWeiss: false, isEnemy: true);
+    //   neuesBrett[7][3] = Schachfigur(
+    //       art: Schachfigurenart.DAME, istWeiss: true, isEnemy: false);
+    //   neuesBrett[0][4] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: true);
+    //   neuesBrett[7][4] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: false);
+    //
+    // whiteKingPosition = [7,4];
+    // blackKingPosition = [0,4];
+    //
+    // } else {
+    //   neuesBrett[0][4] = Schachfigur(
+    //       art: Schachfigurenart.DAME, istWeiss: true, isEnemy: true);
+    //   neuesBrett[7][4] = Schachfigur(
+    //       art: Schachfigurenart.DAME, istWeiss: false, isEnemy: false);
+    //   neuesBrett[0][3] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: true);
+    //   neuesBrett[7][3] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: false);
+    //
+    //   whiteKingPosition = [0,3];
+    //   blackKingPosition = [7,3];
+    //
+    // }
+
+
+      neuesBrett[2][0] = Schachfigur(
+          art: Schachfigurenart.BAUER,
+          istWeiss: figurenfarbe,
+          isEnemy: false);
+
+
+
+
+    if (figurenfarbe) {
+
+      neuesBrett[0][0] = Schachfigur(
+          art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: true);
+      neuesBrett[3][0] = Schachfigur(
+          art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: false);
+
+      whiteKingPosition = [3,0];
+      blackKingPosition = [0,0];
+
+    } else {
+
+
+      neuesBrett[0][0] = Schachfigur(
+          art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: true);
+      neuesBrett[3][0] = Schachfigur(
+          art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: false);
+
+      whiteKingPosition = [0,0];
+      blackKingPosition = [3,0];
+
+    }
+
+
+
+
+    checkStatus= false;
+    weisseFigurenRaus.clear();
+    schwarzeFigurenRaus.clear();
+    isWhiteTurn=true;
+    moveInfos= null;
+
+    brett = neuesBrett;
+  }
+
+  void figurAusgewaehlt(int row, int column) {
+    setState(() {
+      if (ausgewaehlteFigur == null && brett[row][column] != null) {
+        if (brett[row][column]!.istWeiss == isWhiteTurn) {
+          ausgewaehlteFigur = brett[row][column];
+          selectedRow = row;
+          selectedColumn = column;
+          print(
+              "Ausgewählte Figur: ${brett[row][column].toString()} ${koordinatenAnzeige(row, column)}");
+        }
+      } else if (brett[row][column] != null &&
+          brett[row][column]!.istWeiss == ausgewaehlteFigur!.istWeiss) {
+        ausgewaehlteFigur = brett[row][column];
+        selectedRow = row;
+        selectedColumn = column;
+        print(
+            "Ausgewählte Figur: ${brett[row][column].toString()} ${koordinatenAnzeige(row, column)}");
+      } else if (ausgewaehlteFigur != null &&
+          validMoves
+              .any((element) => element[0] == row && element[1] == column)) {
+        bewegeFigur(row, column);
+      }
+
+      validMoves = calculateRealValidMoves(
+          selectedRow, selectedColumn, ausgewaehlteFigur,true);
+    });
+  }
+
+  Future<void> bewegeFigur(int newRow, int newCol) async {
+
+    if (brett[newRow][newCol] != null) {
+      var geschlageneFigur = brett[newRow][newCol];
+
+      if (geschlageneFigur!.istWeiss) {
+        weisseFigurenRaus.add(geschlageneFigur);
+      } else {
+        schwarzeFigurenRaus.add(geschlageneFigur);
+      }
+    }
+
+    print("Bewege: ${ausgewaehlteFigur.toString()} von ${koordinatenAnzeige(selectedRow, selectedColumn)} zu ${koordinatenAnzeige(newRow, newCol)}");
+
+    if(ausgewaehlteFigur!.art == Schachfigurenart.KOENIG){
+
+      if(ausgewaehlteFigur!.istWeiss){
+        whiteKingPosition = [newRow,newCol];
+      }
+      else{
+        blackKingPosition = [newRow,newCol];
+      }
+
+    }
+
+    moveInfos = MoveInfos(
+        oldRow: selectedRow,
+        oldCol: selectedColumn,
+        newRow: newRow,
+        newCol: newCol);
+
+    brett[newRow][newCol] = ausgewaehlteFigur;
+    brett[selectedRow][selectedColumn] = null;
+
+
+    if(isKingInCheck(!isWhiteTurn)){
+      checkStatus = true;
+    }
+    else{
+      checkStatus = false;
+    }
+
+    setState(() {
+      ausgewaehlteFigur = null;
+      selectedRow = -1;
+      selectedColumn = -1;
+      validMoves = [];
+    });
+
+    if(isCheckMate(!isWhiteTurn)){
+
+      String text="";
+      if(isWhiteTurn == figurenfarbe){
+        text="Du hast gewonnen!";
+      }
+      else{
+        if(figurenfarbe){
+          text= "Schwarz hat gewonnen!";
+        }
+        else{
+          text= "Weiß hat gewonnen!";
+        }
+      }
+
+      await  showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (BuildContext context) {
+          return DialogSpielende(spielende: Spielende.SCHACHMATT,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: text, onTapNochmal:  () {resetGame();}, onTapBack:  () {});
+        },
+      );
+
+    }
+    else if(isStaleMate(!isWhiteTurn)){
+
+      await  showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (BuildContext context) {
+          return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Patt!", onTapNochmal:  () {resetGame();}, onTapBack:  () {});
+        },
+      );
+
+    }
+    else{
+      isWhiteTurn = !isWhiteTurn;
+    }
+
+  }
+
+
+  List<List<int>> calculateRawValidMoves(int row, int col, Schachfigur? schachfigur) {
+    List<List<int>> canidateMoves = [];
+
+    if (schachfigur == null) {
+      return [];
+    }
+
+    int direction = schachfigur.isEnemy ? 1 : -1;
+
+    switch (schachfigur.art) {
+      case Schachfigurenart.BAUER:
+        if (isInBoard(row + direction, col) &&
+            brett[row + direction][col] == null) {
+          canidateMoves.add([row + direction, col]);
+        }
+
+        if ((row == 1 && schachfigur.isEnemy) ||
+            (row == 6 && !schachfigur.isEnemy)) {
+          if (isInBoard(row + 2 * direction, col) &&
+              brett[row + 2 * direction][col] == null &&
+              brett[row + direction][col] == null) {
+            canidateMoves.add([row + 2 * direction, col]);
+          }
+        }
+
+        if (isInBoard(row + direction, col - 1) &&
+            brett[row + direction][col - 1] != null &&
+            brett[row + direction][col - 1]!.istWeiss != schachfigur.istWeiss) {
+          canidateMoves.add([row + direction, col - 1]);
+        }
+
+        if (isInBoard(row + direction, col + 1) &&
+            brett[row + direction][col + 1] != null &&
+            brett[row + direction][col + 1]!.istWeiss != schachfigur.istWeiss) {
+          canidateMoves.add([row + direction, col + 1]);
+        }
+
+        break;
+      case Schachfigurenart.SPRINGER:
+        var knightMoves = [
+          [-2, -1], // up 2 left 1
+          [-2, 1], // up 2 right 1
+          [-1, -2], // up 1 left 2
+          [-1, 2], // up 1 right 2
+          [1, -2], // down 1 left 2
+          [1, 2], // down 1 right 2
+          [2, -1], // down 2 left 1
+          [2, 1], // down 2 right 1
+        ];
+
+        for (var move in knightMoves) {
+          var newRow = row + move[0];
+          var newCol = col + move[1];
+
+          if (!isInBoard(newRow, newCol)) {
+            continue;
+          }
+
+          if (brett[newRow][newCol] != null) {
+            if (brett[newRow][newCol]!.istWeiss != schachfigur.istWeiss) {
+              canidateMoves.add([newRow, newCol]); // capture
+            }
+            continue; // blocked
+          }
+
+          canidateMoves.add([newRow, newCol]);
+        }
+        break;
+
+      case Schachfigurenart.LAEUFER:
+        var directions = [
+          [-1, -1], // up
+          [-1, 1], // down
+          [1, -1], //left
+          [1, 1], //right
+        ];
+
+        for (var direction in directions) {
+          var i = 1;
+
+          while (true) {
+            var newRow = row + i * direction[0];
+            var newCol = col + i * direction[1];
+
+            if (!isInBoard(newRow, newCol)) {
+              break;
+            }
+
+            if (brett[newRow][newCol] != null) {
+              if (brett[newRow][newCol]!.istWeiss != schachfigur.istWeiss) {
+                canidateMoves.add([newRow, newCol]); // capture
+              }
+              break; // block
+            }
+
+            canidateMoves.add([newRow, newCol]);
+            i++;
+          }
+        }
+
+        break;
+
+      case Schachfigurenart.TURM:
+        var directions = [
+          [-1, 0], // up
+          [1, 0], // down
+          [0, -1], //left
+          [0, 1], //right
+        ];
+
+        for (var direction in directions) {
+          var i = 1;
+
+          while (true) {
+            var newRow = row + i * direction[0];
+            var newCol = col + i * direction[1];
+
+            if (!isInBoard(newRow, newCol)) {
+              break;
+            }
+
+            if (brett[newRow][newCol] != null) {
+              if (brett[newRow][newCol]!.istWeiss != schachfigur.istWeiss) {
+                canidateMoves.add([newRow, newCol]); // kill
+              }
+
+              break; // blocked
+            }
+            canidateMoves.add([newRow, newCol]);
+            i++;
+          }
+        }
+
+        break;
+      case Schachfigurenart.DAME:
+        var directions = [
+          [-1, 0], // up
+          [1, 0], // down
+          [0, -1], // left
+          [0, 1], // right
+          [-1, -1], // up left
+          [-1, 1], // up right
+          [1, -1], // down left
+          [1, 1], // down right
+        ];
+
+        for (var direction in directions) {
+          var i = 1;
+
+          while (true) {
+            var newRow = row + i * direction[0];
+            var newCol = col + i * direction[1];
+
+            if (!isInBoard(newRow, newCol)) {
+              break;
+            }
+
+            if (brett[newRow][newCol] != null) {
+              if (brett[newRow][newCol]!.istWeiss != schachfigur.istWeiss) {
+                canidateMoves.add([newRow, newCol]); // capture
+              }
+              break; // blocked
+            }
+
+            canidateMoves.add([newRow, newCol]);
+            i++;
+          }
+        }
+        break;
+      case Schachfigurenart.KOENIG:
+        var directions = [
+          [-1, 0], // up
+          [1, 0], // down
+          [0, -1], // left
+          [0, 1], // right
+          [-1, -1], // up left
+          [-1, 1], // up right
+          [1, -1], // down left
+          [1, 1], // down right
+        ];
+
+        for (var direction in directions) {
+          var newRow = row + direction[0];
+          var newCol = col + direction[1];
+
+          if (!isInBoard(newRow, newCol)) {
+            continue;
+          }
+
+          if (brett[newRow][newCol] != null) {
+            if (brett[newRow][newCol]!.istWeiss != schachfigur.istWeiss) {
+              canidateMoves.add([newRow, newCol]); // capture
+            }
+            continue; // blocked
+          }
+
+          canidateMoves.add([newRow, newCol]);
+        }
+
+        break;
+      default:
+        return [];
+    }
+
+    return canidateMoves;
+  }
+
+  List<List<int>> calculateRealValidMoves(int row, int col, Schachfigur? schachfigur, bool checkSimulation){
+
+    List<List<int>> realValidMoves = [];
+    List<List<int>> candidateMoves = calculateRawValidMoves(row, col, schachfigur);
+
+    if(checkSimulation){
+
+      for(var move in candidateMoves){
+        int endRow = move[0];
+        int endCol = move[1];
+        if(simulatedMoveIsSave(schachfigur!, row, col, endRow, endCol)){
+          realValidMoves.add(move);
+        }
+      }
+
+    }
+    else{
+        realValidMoves = candidateMoves;
+    }
+
+    return realValidMoves;
+  }
+
+  bool isKingInCheck(bool isWhiteKing){
+
+    List<int> kingposition = isWhiteKing ? whiteKingPosition : blackKingPosition;
+
+    for(int i = 0; i < 8; i++){
+      for(int j = 0; j < 8; j++){
+
+        if(brett[i][j] == null || brett[i][j]!.istWeiss == isWhiteKing){
+          continue;
+        }
+
+        List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j],false);
+        if(pieceValidMoves.any((move) => move[0] == kingposition[0] && move[1] == kingposition[1])){
+          return true;
+        }
+
+      }
+    }
+
+    return false;
+
+  }
+
+  bool simulatedMoveIsSave(Schachfigur figur, int startRow, int startCol, int endRow, int endCol){
+
+    Schachfigur? originalDestinationPiece = brett[endRow][endCol];
+
+    List<int>? originalKingPosition;
+    if(figur.art == Schachfigurenart.KOENIG){
+
+      originalKingPosition= figur.istWeiss ? whiteKingPosition : blackKingPosition;
+
+      if(figur.istWeiss){
+        whiteKingPosition = [endRow,endCol];
+      }
+      else{
+        blackKingPosition = [endRow,endCol];
+      }
+
+    }
+
+    brett[endRow][endCol] = figur;
+    brett[startRow][startCol] = null;
+
+    bool kingInCheck = isKingInCheck(figur.istWeiss);
+
+    brett[startRow][startCol] = figur;
+    brett[endRow][endCol] = originalDestinationPiece;
+
+    if(figur.art == Schachfigurenart.KOENIG){
+      if(figur.istWeiss){
+        whiteKingPosition = originalKingPosition!;
+      }
+      else{
+        blackKingPosition = originalKingPosition!;
+      }
+    }
+
+    return !kingInCheck;
+
+  }
+
+  bool isCheckMate(bool isWhiteKing){
+
+    if(!isKingInCheck(isWhiteKing)){
+          return false;
+    }
+
+    for(int i = 0; i < 8; i++){
+      for(int j = 0; j < 8; j++){
+
+        if(brett[i][j] == null || brett[i][j]!.istWeiss != isWhiteKing){
+          continue;
+        }
+
+        List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j],true);
+        if(pieceValidMoves.isNotEmpty){
+          return false;
+        }
+
+      }
+    }
+
+    return true;
+
+  }
+
+  bool isStaleMate(bool isWhiteKing){
+
+    for(int i = 0; i < 8; i++){
+      for(int j = 0; j < 8; j++){
+
+        if(brett[i][j] == null || brett[i][j]!.istWeiss != isWhiteKing){
+          continue;
+        }
+
+        List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j],true);
+        if(pieceValidMoves.isNotEmpty){
+          return false;
+        }
+
+      }
+    }
+
+    return true;
+
+  }
+
+
+  String koordinatenAnzeige(int row, int col) {
+    if (figurenfarbe) {
+      int r = 8 - row;
+
+      String c = "";
+      switch (col) {
+        case 0:
+          c = "A";
+          break;
+        case 1:
+          c = "B";
+          break;
+        case 2:
+          c = "C";
+          break;
+        case 3:
+          c = "D";
+          break;
+        case 4:
+          c = "E";
+          break;
+        case 5:
+          c = "F";
+          break;
+        case 6:
+          c = "G";
+          break;
+        case 7:
+          c = "H";
+          break;
+        default:
+          "";
+      }
+
+      return "$c$r";
+    } else {
+      int r = row + 1;
+
+      String c = "";
+      switch (col) {
+        case 0:
+          c = "H";
+          break;
+        case 1:
+          c = "G";
+          break;
+        case 2:
+          c = "F";
+          break;
+        case 3:
+          c = "E";
+          break;
+        case 4:
+          c = "D";
+          break;
+        case 5:
+          c = "C";
+          break;
+        case 6:
+          c = "B";
+          break;
+        case 7:
+          c = "A";
+          break;
+        default:
+          "";
+      }
+
+      return "$c$r";
+    }
+  }
+
+
+  void resetGame(){
+
+    Navigator.pop(context);
+
+    setState(() {
+      _startSpielbrett();
+    });
+
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                color: backgroundColor,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+                child: GridView.builder(
+                    itemCount: figurenfarbe
+                        ? weisseFigurenRaus.length
+                        : schwarzeFigurenRaus.length,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 8),
+                    itemBuilder: (context, index) {
+                      return Image.asset(
+                        figurenfarbe
+                            ? weisseFigurenRaus[index].bild
+                            : schwarzeFigurenRaus[index].bild,
+                        color:
+                            figurenfarbe ? Colors.grey[400] : Colors.grey[800],
+                      );
+                    }),
+              ),
+            ),
+
+            Text(checkStatus ? "Check!" : "Nö"),
+
+            Container(
+              color: Colors.red,
+              height: MediaQuery.of(context).size.width,
+              child: GridView.builder(
+                  itemCount: 8 * 8,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 8),
+                  itemBuilder: (context, index) {
+
+                    int row = index ~/ 8;
+                    int col = index % 8;
+
+                    bool ausgewaehlt =
+                        selectedRow == row && selectedColumn == col;
+
+                    bool isValidMove = false;
+
+                    for (var position in validMoves) {
+                      if (position[0] == row && position[1] == col) {
+                        isValidMove = true;
+                      }
+                    }
+
+                    bool lastMoveFrom = false;
+                    bool lastMoveTo = false;
+                    if (moveInfos != null) {
+                      lastMoveFrom =
+                          moveInfos!.oldRow == row && moveInfos!.oldCol == col;
+                      lastMoveTo =
+                          moveInfos!.newRow == row && moveInfos!.newCol == col;
+                    }
+
+                    bool kingInCheck=false;
+                    bool isCheckmate= false;
+                    if( isKingInCheck(true) && whiteKingPosition[0] == row && whiteKingPosition[1] == col ){
+                       kingInCheck=true;
+                    }
+                    if( isKingInCheck(false) && blackKingPosition[0] == row && blackKingPosition[1] == col){
+                      kingInCheck=true;
+                    }
+                    if(isCheckMate(true) && whiteKingPosition[0] == row && whiteKingPosition[1] == col){
+                      isCheckmate=true;
+                    }
+                    if(isCheckMate(false) && blackKingPosition[0] == row && blackKingPosition[1] == col){
+                      isCheckmate=true;
+                    }
+
+                    return Feld(
+                      istWeiss: istWeiss(index),
+                      figur: brett[row][col],
+                      ausgewaehlt: ausgewaehlt,
+                      isValidMove: isValidMove,
+                      lastMoveFrom: lastMoveFrom,
+                      lastMoveTo: lastMoveTo,
+                      kingInCheck: kingInCheck,
+                      isCheckmate: isCheckmate,
+                      onTap: () {
+                        figurAusgewaehlt(row, col);
+                      },
+                    );
+                  }),
+            ),
+            Expanded(
+              child: Container(
+                color: backgroundColor,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+                child: GridView.builder(
+                    itemCount: figurenfarbe
+                        ? schwarzeFigurenRaus.length
+                        : weisseFigurenRaus.length,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 8),
+                    itemBuilder: (context, index) {
+                      return Image.asset(
+                        figurenfarbe
+                            ? schwarzeFigurenRaus[index].bild
+                            : weisseFigurenRaus[index].bild,
+                        color:
+                            figurenfarbe ? Colors.grey[800] : Colors.grey[400],
+                      );
+                    }),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
