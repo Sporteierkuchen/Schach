@@ -1,23 +1,25 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:schach/components/Dialog.dart';
 import 'package:schach/components/Move%20Infos.dart';
 import 'package:schach/components/Schachfigur.dart';
 import 'package:schach/components/feld.dart';
 import 'package:schach/helper/helper.dart';
-import 'package:schach/spielbrett.dart';
+import 'package:schach/spielauswahl.dart';
 import 'package:schach/values/colors.dart';
 
 import 'components/Enums.dart';
 
 class SpielBrett extends StatefulWidget {
-  const SpielBrett({super.key});
+
+  bool figurenfarbe;
+  SpielBrett({super.key, required this.figurenfarbe});
 
   @override
   State<SpielBrett> createState() => _SpielBrettState();
 }
 
 class _SpielBrettState extends State<SpielBrett> {
+
   late bool figurenfarbe; //false=schwarz true=weiß
 
   late List<List<Schachfigur?>> brett;
@@ -42,8 +44,11 @@ class _SpielBrettState extends State<SpielBrett> {
 
   @override
   void initState() {
-    figurenfarbe = true;
+
+    figurenfarbe = widget.figurenfarbe;
+
     _startSpielbrett();
+
   }
 
   void _startSpielbrett() {
@@ -62,128 +67,128 @@ class _SpielBrettState extends State<SpielBrett> {
     //       6
     //       7
 
-    // for (int i = 0; i < 8; i++) {
-    //   neuesBrett[1][i] = Schachfigur(
-    //       art: Schachfigurenart.BAUER,
-    //       istWeiss: figurenfarbe ? false : true,
-    //       isEnemy: true);
-    //   neuesBrett[6][i] = Schachfigur(
-    //       art: Schachfigurenart.BAUER,
-    //       istWeiss: figurenfarbe ? true : false,
-    //       isEnemy: false);
-    // }
-    //
-    // neuesBrett[0][0] = Schachfigur(
-    //     art: Schachfigurenart.TURM,
-    //     istWeiss: figurenfarbe ? false : true,
-    //     isEnemy: true);
-    // neuesBrett[0][7] = Schachfigur(
-    //     art: Schachfigurenart.TURM,
-    //     istWeiss: figurenfarbe ? false : true,
-    //     isEnemy: true);
-    // neuesBrett[7][0] = Schachfigur(
-    //     art: Schachfigurenart.TURM,
-    //     istWeiss: figurenfarbe ? true : false,
-    //     isEnemy: false);
-    // neuesBrett[7][7] = Schachfigur(
-    //     art: Schachfigurenart.TURM,
-    //     istWeiss: figurenfarbe ? true : false,
-    //     isEnemy: false);
-    //
-    // neuesBrett[0][1] = Schachfigur(
-    //     art: Schachfigurenart.SPRINGER,
-    //     istWeiss: figurenfarbe ? false : true,
-    //     isEnemy: true);
-    // neuesBrett[0][6] = Schachfigur(
-    //     art: Schachfigurenart.SPRINGER,
-    //     istWeiss: figurenfarbe ? false : true,
-    //     isEnemy: true);
-    // neuesBrett[7][1] = Schachfigur(
-    //     art: Schachfigurenart.SPRINGER,
-    //     istWeiss: figurenfarbe ? true : false,
-    //     isEnemy: false);
-    // neuesBrett[7][6] = Schachfigur(
-    //     art: Schachfigurenart.SPRINGER,
-    //     istWeiss: figurenfarbe ? true : false,
-    //     isEnemy: false);
-    //
-    // neuesBrett[0][2] = Schachfigur(
-    //     art: Schachfigurenart.LAEUFER,
-    //     istWeiss: figurenfarbe ? false : true,
-    //     isEnemy: true);
-    // neuesBrett[0][5] = Schachfigur(
-    //     art: Schachfigurenart.LAEUFER,
-    //     istWeiss: figurenfarbe ? false : true,
-    //     isEnemy: true);
-    // neuesBrett[7][2] = Schachfigur(
-    //     art: Schachfigurenart.LAEUFER,
-    //     istWeiss: figurenfarbe ? true : false,
-    //     isEnemy: false);
-    // neuesBrett[7][5] = Schachfigur(
-    //     art: Schachfigurenart.LAEUFER,
-    //     istWeiss: figurenfarbe ? true : false,
-    //     isEnemy: false);
-    //
-    // if (figurenfarbe) {
-    //   neuesBrett[0][3] = Schachfigur(
-    //       art: Schachfigurenart.DAME, istWeiss: false, isEnemy: true);
-    //   neuesBrett[7][3] = Schachfigur(
-    //       art: Schachfigurenart.DAME, istWeiss: true, isEnemy: false);
-    //   neuesBrett[0][4] = Schachfigur(
-    //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: true);
-    //   neuesBrett[7][4] = Schachfigur(
-    //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: false);
-    //
-    // whiteKingPosition = [7,4];
-    // blackKingPosition = [0,4];
-    //
-    // } else {
-    //   neuesBrett[0][4] = Schachfigur(
-    //       art: Schachfigurenart.DAME, istWeiss: true, isEnemy: true);
-    //   neuesBrett[7][4] = Schachfigur(
-    //       art: Schachfigurenart.DAME, istWeiss: false, isEnemy: false);
-    //   neuesBrett[0][3] = Schachfigur(
-    //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: true);
-    //   neuesBrett[7][3] = Schachfigur(
-    //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: false);
-    //
-    //   whiteKingPosition = [0,3];
-    //   blackKingPosition = [7,3];
-    //
-    // }
-
-
-      neuesBrett[2][0] = Schachfigur(
+    for (int i = 0; i < 8; i++) {
+      neuesBrett[1][i] = Schachfigur(
           art: Schachfigurenart.BAUER,
-          istWeiss: figurenfarbe,
+          istWeiss: figurenfarbe ? false : true,
+          isEnemy: true);
+      neuesBrett[6][i] = Schachfigur(
+          art: Schachfigurenart.BAUER,
+          istWeiss: figurenfarbe ? true : false,
           isEnemy: false);
+    }
 
+    neuesBrett[0][0] = Schachfigur(
+        art: Schachfigurenart.TURM,
+        istWeiss: figurenfarbe ? false : true,
+        isEnemy: true);
+    neuesBrett[0][7] = Schachfigur(
+        art: Schachfigurenart.TURM,
+        istWeiss: figurenfarbe ? false : true,
+        isEnemy: true);
+    neuesBrett[7][0] = Schachfigur(
+        art: Schachfigurenart.TURM,
+        istWeiss: figurenfarbe ? true : false,
+        isEnemy: false);
+    neuesBrett[7][7] = Schachfigur(
+        art: Schachfigurenart.TURM,
+        istWeiss: figurenfarbe ? true : false,
+        isEnemy: false);
 
+    neuesBrett[0][1] = Schachfigur(
+        art: Schachfigurenart.SPRINGER,
+        istWeiss: figurenfarbe ? false : true,
+        isEnemy: true);
+    neuesBrett[0][6] = Schachfigur(
+        art: Schachfigurenart.SPRINGER,
+        istWeiss: figurenfarbe ? false : true,
+        isEnemy: true);
+    neuesBrett[7][1] = Schachfigur(
+        art: Schachfigurenart.SPRINGER,
+        istWeiss: figurenfarbe ? true : false,
+        isEnemy: false);
+    neuesBrett[7][6] = Schachfigur(
+        art: Schachfigurenart.SPRINGER,
+        istWeiss: figurenfarbe ? true : false,
+        isEnemy: false);
 
+    neuesBrett[0][2] = Schachfigur(
+        art: Schachfigurenart.LAEUFER,
+        istWeiss: figurenfarbe ? false : true,
+        isEnemy: true);
+    neuesBrett[0][5] = Schachfigur(
+        art: Schachfigurenart.LAEUFER,
+        istWeiss: figurenfarbe ? false : true,
+        isEnemy: true);
+    neuesBrett[7][2] = Schachfigur(
+        art: Schachfigurenart.LAEUFER,
+        istWeiss: figurenfarbe ? true : false,
+        isEnemy: false);
+    neuesBrett[7][5] = Schachfigur(
+        art: Schachfigurenart.LAEUFER,
+        istWeiss: figurenfarbe ? true : false,
+        isEnemy: false);
 
     if (figurenfarbe) {
-
-      neuesBrett[0][0] = Schachfigur(
+      neuesBrett[0][3] = Schachfigur(
+          art: Schachfigurenart.DAME, istWeiss: false, isEnemy: true);
+      neuesBrett[7][3] = Schachfigur(
+          art: Schachfigurenart.DAME, istWeiss: true, isEnemy: false);
+      neuesBrett[0][4] = Schachfigur(
           art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: true);
-      neuesBrett[3][0] = Schachfigur(
+      neuesBrett[7][4] = Schachfigur(
           art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: false);
 
-      whiteKingPosition = [3,0];
-      blackKingPosition = [0,0];
+    whiteKingPosition = [7,4];
+    blackKingPosition = [0,4];
 
     } else {
-
-
-      neuesBrett[0][0] = Schachfigur(
+      neuesBrett[0][4] = Schachfigur(
+          art: Schachfigurenart.DAME, istWeiss: true, isEnemy: true);
+      neuesBrett[7][4] = Schachfigur(
+          art: Schachfigurenart.DAME, istWeiss: false, isEnemy: false);
+      neuesBrett[0][3] = Schachfigur(
           art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: true);
-      neuesBrett[3][0] = Schachfigur(
+      neuesBrett[7][3] = Schachfigur(
           art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: false);
 
-      whiteKingPosition = [0,0];
-      blackKingPosition = [3,0];
+      whiteKingPosition = [0,3];
+      blackKingPosition = [7,3];
 
     }
 
+
+    //   neuesBrett[2][0] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: figurenfarbe,
+    //       isEnemy: false);
+    //
+    //
+    //
+    //
+    // if (figurenfarbe) {
+    //
+    //   neuesBrett[0][0] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: true);
+    //   neuesBrett[3][0] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: false);
+    //
+    //   whiteKingPosition = [3,0];
+    //   blackKingPosition = [0,0];
+    //
+    // } else {
+    //
+    //
+    //   neuesBrett[0][0] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: true);
+    //   neuesBrett[3][0] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: false);
+    //
+    //   whiteKingPosition = [0,0];
+    //   blackKingPosition = [3,0];
+    //
+    // }
+    //
 
 
 
@@ -292,7 +297,8 @@ class _SpielBrettState extends State<SpielBrett> {
         barrierDismissible: false,
         context: context,
         builder: (BuildContext context) {
-          return DialogSpielende(spielende: Spielende.SCHACHMATT,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: text, onTapNochmal:  () {resetGame();}, onTapBack:  () {});
+          return DialogSpielende(spielende: Spielende.SCHACHMATT,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: text, onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+          await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
         },
       );
 
@@ -303,7 +309,8 @@ class _SpielBrettState extends State<SpielBrett> {
         barrierDismissible: false,
         context: context,
         builder: (BuildContext context) {
-          return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Patt!", onTapNochmal:  () {resetGame();}, onTapBack:  () {});
+          return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Patt!", onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+          await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
         },
       );
 
@@ -739,128 +746,175 @@ class _SpielBrettState extends State<SpielBrett> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Container(
-                color: backgroundColor,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
-                child: GridView.builder(
-                    itemCount: figurenfarbe
-                        ? weisseFigurenRaus.length
-                        : schwarzeFigurenRaus.length,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 8),
-                    itemBuilder: (context, index) {
-                      return Image.asset(
-                        figurenfarbe
-                            ? weisseFigurenRaus[index].bild
-                            : schwarzeFigurenRaus[index].bild,
-                        color:
-                            figurenfarbe ? Colors.grey[400] : Colors.grey[800],
-                      );
-                    }),
-              ),
-            ),
 
-            Text(checkStatus ? "Check!" : "Nö"),
+    return
 
-            Container(
-              color: Colors.red,
-              height: MediaQuery.of(context).size.width,
-              child: GridView.builder(
-                  itemCount: 8 * 8,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 8),
-                  itemBuilder: (context, index) {
+      PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool a,b) async {
+          await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return DialogSpielabbruch(
+                onTapNein:() {
+                  Navigator.pop(context);
+                },
+                onTapJa:  () async {
+                  Navigator.pop(context);
+                  await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));
+                }
+            );
+          },
+          );
+        },
+        child: SafeArea(
+          child: Scaffold(
+          backgroundColor: backgroundColor,
+          appBar: AppBar(
+            backgroundColor: backgroundColor,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back,color: Colors.black, size: 35,),
+            onPressed: () async {
 
-                    int row = index ~/ 8;
-                    int col = index % 8;
-
-                    bool ausgewaehlt =
-                        selectedRow == row && selectedColumn == col;
-
-                    bool isValidMove = false;
-
-                    for (var position in validMoves) {
-                      if (position[0] == row && position[1] == col) {
-                        isValidMove = true;
-                      }
-                    }
-
-                    bool lastMoveFrom = false;
-                    bool lastMoveTo = false;
-                    if (moveInfos != null) {
-                      lastMoveFrom =
-                          moveInfos!.oldRow == row && moveInfos!.oldCol == col;
-                      lastMoveTo =
-                          moveInfos!.newRow == row && moveInfos!.newCol == col;
-                    }
-
-                    bool kingInCheck=false;
-                    bool isCheckmate= false;
-                    if( isKingInCheck(true) && whiteKingPosition[0] == row && whiteKingPosition[1] == col ){
-                       kingInCheck=true;
-                    }
-                    if( isKingInCheck(false) && blackKingPosition[0] == row && blackKingPosition[1] == col){
-                      kingInCheck=true;
-                    }
-                    if(isCheckMate(true) && whiteKingPosition[0] == row && whiteKingPosition[1] == col){
-                      isCheckmate=true;
-                    }
-                    if(isCheckMate(false) && blackKingPosition[0] == row && blackKingPosition[1] == col){
-                      isCheckmate=true;
-                    }
-
-                    return Feld(
-                      istWeiss: istWeiss(index),
-                      figur: brett[row][col],
-                      ausgewaehlt: ausgewaehlt,
-                      isValidMove: isValidMove,
-                      lastMoveFrom: lastMoveFrom,
-                      lastMoveTo: lastMoveTo,
-                      kingInCheck: kingInCheck,
-                      isCheckmate: isCheckmate,
-                      onTap: () {
-                        figurAusgewaehlt(row, col);
+             await showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return DialogSpielabbruch(
+                      onTapNein:() {
+                        Navigator.pop(context);
                       },
-                    );
-                  }),
-            ),
-            Expanded(
-              child: Container(
+                      onTapJa:  () async {
+                        Navigator.pop(context);
+                        await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));
+                      }
+                   );
+                },
+              );
+
+            },
+          ),
+        ),
+
+          body: Column(
+            children: [
+              Expanded(
+                child: Container(
+                  color: backgroundColor,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+                  child: GridView.builder(
+                      itemCount: figurenfarbe
+                          ? weisseFigurenRaus.length
+                          : schwarzeFigurenRaus.length,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 8),
+                      itemBuilder: (context, index) {
+                        return Image.asset(
+                          figurenfarbe
+                              ? weisseFigurenRaus[index].bild
+                              : schwarzeFigurenRaus[index].bild,
+                          color:
+                              figurenfarbe ? Colors.grey[400] : Colors.grey[800],
+                        );
+                      }),
+                ),
+              ),
+
+              checkStatus ? const Text("Check!") : Container(),
+
+              Container(
                 color: backgroundColor,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+                height: MediaQuery.of(context).size.width,
                 child: GridView.builder(
-                    itemCount: figurenfarbe
-                        ? schwarzeFigurenRaus.length
-                        : weisseFigurenRaus.length,
+                    itemCount: 8 * 8,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 8),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 8),
                     itemBuilder: (context, index) {
-                      return Image.asset(
-                        figurenfarbe
-                            ? schwarzeFigurenRaus[index].bild
-                            : weisseFigurenRaus[index].bild,
-                        color:
-                            figurenfarbe ? Colors.grey[800] : Colors.grey[400],
+
+                      int row = index ~/ 8;
+                      int col = index % 8;
+
+                      bool ausgewaehlt =
+                          selectedRow == row && selectedColumn == col;
+
+                      bool isValidMove = false;
+
+                      for (var position in validMoves) {
+                        if (position[0] == row && position[1] == col) {
+                          isValidMove = true;
+                        }
+                      }
+
+                      bool lastMoveFrom = false;
+                      bool lastMoveTo = false;
+                      if (moveInfos != null) {
+                        lastMoveFrom =
+                            moveInfos!.oldRow == row && moveInfos!.oldCol == col;
+                        lastMoveTo =
+                            moveInfos!.newRow == row && moveInfos!.newCol == col;
+                      }
+
+                      bool kingInCheck=false;
+                      bool isCheckmate= false;
+                      if( isKingInCheck(true) && whiteKingPosition[0] == row && whiteKingPosition[1] == col ){
+                         kingInCheck=true;
+                      }
+                      if( isKingInCheck(false) && blackKingPosition[0] == row && blackKingPosition[1] == col){
+                        kingInCheck=true;
+                      }
+                      if(isCheckMate(true) && whiteKingPosition[0] == row && whiteKingPosition[1] == col){
+                        isCheckmate=true;
+                      }
+                      if(isCheckMate(false) && blackKingPosition[0] == row && blackKingPosition[1] == col){
+                        isCheckmate=true;
+                      }
+
+                      return Feld(
+                        istWeiss: istWeiss(index),
+                        figur: brett[row][col],
+                        ausgewaehlt: ausgewaehlt,
+                        isValidMove: isValidMove,
+                        lastMoveFrom: lastMoveFrom,
+                        lastMoveTo: lastMoveTo,
+                        kingInCheck: kingInCheck,
+                        isCheckmate: isCheckmate,
+                        onTap: () {
+                          figurAusgewaehlt(row, col);
+                        },
                       );
                     }),
               ),
-            ),
-          ],
+              Expanded(
+                child: Container(
+                  color: backgroundColor,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+                  child: GridView.builder(
+                      itemCount: figurenfarbe
+                          ? schwarzeFigurenRaus.length
+                          : weisseFigurenRaus.length,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 8),
+                      itemBuilder: (context, index) {
+                        return Image.asset(
+                          figurenfarbe
+                              ? schwarzeFigurenRaus[index].bild
+                              : weisseFigurenRaus[index].bild,
+                          color:
+                              figurenfarbe ? Colors.grey[800] : Colors.grey[400],
+                        );
+                      }),
+                ),
+              ),
+            ],
+          ),
+              ),
         ),
-      ),
-    );
+      );
   }
 }

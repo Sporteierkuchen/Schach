@@ -131,3 +131,121 @@ class DialogSpielende extends StatelessWidget{
   }
 
 }
+
+class DialogSpielabbruch extends StatelessWidget{
+
+  final void Function()? onTapNein;
+  final void Function()? onTapJa;
+
+  const DialogSpielabbruch({
+    super.key,
+    required this.onTapNein,
+    required this.onTapJa,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+
+    return
+
+      AlertDialog(
+        titlePadding: const EdgeInsets.symmetric(horizontal: 20,vertical: 15),
+        contentPadding: const EdgeInsets.only(left: 20,right: 20, top: 0, bottom: 25),
+        actionsPadding: const EdgeInsets.only(left: 20,right: 20, top: 0, bottom: 10),
+        title:
+        Container(
+          alignment: Alignment.center,
+          child: const Text(
+           "Abbrechen",
+            style: TextStyle(
+                fontSize: 35,
+                height: 0,
+                color: Colors.black,
+                fontWeight: FontWeight.bold),
+
+          ),
+        ),
+        surfaceTintColor: Colors.black,
+        backgroundColor: Colors.grey,
+        content:
+        const Text(
+          "Willst du das Spiel wirklich abbrechen?",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontSize: 30,
+              height: 0,
+              color: Colors.white,
+              fontWeight: FontWeight.bold),
+
+        ) ,
+        actions: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onTapNein,
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.black,
+                    side: const BorderSide(color: Colors.grey, width: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    // Text Color (Foreground color)
+                  ),
+                  child:
+                  const Text(
+                    'Nein',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 18,
+                        height: 0
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 20,),
+
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onTapJa,
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.black,
+                    side: const BorderSide(color: Colors.grey, width: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    // Text Color (Foreground color)
+                  ),
+                  child:
+                  const Text(
+                    'Ja',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 18,
+                        height: 0
+                    ),
+                  ),
+                ),
+              ),
+
+            ],
+          ),
+
+        ],
+      );
+
+  }
+
+}
