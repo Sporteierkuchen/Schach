@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:schach/components/Spielart.dart';
+import 'package:schach/components/Toast.dart';
 import 'package:schach/spielbrett.dart';
 import 'package:schach/values/colors.dart';
 
@@ -186,39 +187,7 @@ class _SpielAuswahlState extends State<SpielAuswahl> {
 
                   }
                   else{
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          duration: Duration(seconds: 5),
-                          content: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.max,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(left: 5, right: 15, top: 5, bottom: 5),
-                                child:
-                                Icon(color: Colors.blue, size: 40, Icons.info),
-                              ),
-                              Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.all(4.0),
-                                  child: Text(
-                                    "Wähle die Farbe deiner Figuren aus, mit denen du spielen willst!",
-                                    softWrap: true,
-                                    style: TextStyle(
-                                      height: 0,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                    );
+                    showInfo(context: context, text: "Wähle die Farbe deiner Figuren aus, mit denen du spielen willst!");
                   }
 
                 },

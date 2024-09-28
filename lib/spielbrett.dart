@@ -1,7 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:schach/components/Dialog.dart';
+import 'package:schach/components/FigurenMoves.dart';
 import 'package:schach/components/Move%20Infos.dart';
 import 'package:schach/components/Schachfigur.dart';
+import 'package:schach/components/Toast.dart';
 import 'package:schach/components/feld.dart';
 import 'package:schach/helper/helper.dart';
 import 'package:schach/spielauswahl.dart';
@@ -48,6 +52,11 @@ class _SpielBrettState extends State<SpielBrett> {
     figurenfarbe = widget.figurenfarbe;
 
     _startSpielbrett();
+
+    if(figurenfarbe == false){
+      computerMove();
+      isWhiteTurn = !isWhiteTurn;
+    }
 
   }
 
@@ -204,7 +213,7 @@ class _SpielBrettState extends State<SpielBrett> {
   void figurAusgewaehlt(int row, int column) {
     setState(() {
       if (ausgewaehlteFigur == null && brett[row][column] != null) {
-        if (brett[row][column]!.istWeiss == isWhiteTurn) {
+        if (brett[row][column]!.istWeiss == isWhiteTurn && !brett[row][column]!.isEnemy) {
           ausgewaehlteFigur = brett[row][column];
           selectedRow = row;
           selectedColumn = column;
@@ -279,20 +288,13 @@ class _SpielBrettState extends State<SpielBrett> {
     brett[newRow][newCol] = ausgewaehlteFigur;
     brett[selectedRow][selectedColumn] = null;
 
-
-    if(isKingInCheck(!isWhiteTurn)){
-      checkStatus = true;
-    }
-    else{
-      checkStatus = false;
-    }
-
     setState(() {
       ausgewaehlteFigur = null;
       selectedRow = -1;
       selectedColumn = -1;
       validMoves = [];
     });
+
 
     if(isCheckMate(!isWhiteTurn)){
 
@@ -309,31 +311,46 @@ class _SpielBrettState extends State<SpielBrett> {
         }
       }
 
+      isWhiteTurn = !isWhiteTurn;
+      await warten(const Duration(seconds: 1, milliseconds: 500));
+
       await  showDialog(
         barrierDismissible: false,
         context: context,
         builder: (BuildContext context) {
-          return DialogSpielende(spielende: Spielende.SCHACHMATT,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: text, onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+          return DialogSpielende(spielende: Spielende.SCHACHMATT,isWhiteTurn: !isWhiteTurn, figurenfarbe: figurenfarbe, text: text, onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
           await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
         },
       );
-
+      return;
     }
     else if(isStaleMate(!isWhiteTurn)){
 
+      isWhiteTurn = !isWhiteTurn;
+      await warten(const Duration(seconds: 1, milliseconds: 500));
+
       await  showDialog(
         barrierDismissible: false,
         context: context,
         builder: (BuildContext context) {
-          return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Patt!", onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+          return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: !isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Patt!", onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
           await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
         },
       );
+      return;
+    }
 
+    if(isKingInCheck(!isWhiteTurn)){
+      checkStatus = true;
+      showWarning(context: context, text: "Schach!", duration: const Duration(seconds: 2));
     }
     else{
-      isWhiteTurn = !isWhiteTurn;
+      checkStatus = false;
     }
+
+      isWhiteTurn = !isWhiteTurn;
+      await computerMove();
+      isWhiteTurn = !isWhiteTurn;
 
   }
 
@@ -579,7 +596,136 @@ class _SpielBrettState extends State<SpielBrett> {
       return false;
       }
 
+    Future<void> computerMove() async {
 
+      List<FigurenMoves> allPosibleEnemyMoves=[];
+
+      for(int i = 0; i < 8; i++){
+        for(int j = 0; j < 8; j++){
+
+          if(brett[i][j] == null || !brett[i][j]!.isEnemy){
+            continue;
+          }
+
+          List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j],true);
+
+          if(pieceValidMoves.isNotEmpty){
+            allPosibleEnemyMoves.add(FigurenMoves(row: i, col: j, figur: brett[i][j]!, pieceValidMoves: pieceValidMoves));
+          }
+
+        }
+      }
+
+      Random zufall = Random();
+      FigurenMoves figurenMoves= allPosibleEnemyMoves[zufall.nextInt(allPosibleEnemyMoves.length)];
+      List<int> randomMove= figurenMoves.pieceValidMoves[zufall.nextInt(figurenMoves.pieceValidMoves.length)];
+
+
+      await warten(const Duration(seconds: 1, milliseconds: 500));
+
+
+      if (brett[randomMove[0]][randomMove[1]] != null) {
+        var geschlageneFigur = brett[randomMove[0]][randomMove[1]];
+
+        if (geschlageneFigur!.istWeiss) {
+          weisseFigurenRaus.add(geschlageneFigur);
+        } else {
+          schwarzeFigurenRaus.add(geschlageneFigur);
+        }
+      }
+
+       print("Gegner bewegt: ${figurenMoves.figur.toString()} von ${koordinatenAnzeige(figurenMoves.row, figurenMoves.col)} zu ${koordinatenAnzeige(randomMove[0], randomMove[1])}");
+
+      if(figurenMoves.figur.art == Schachfigurenart.KOENIG){
+
+        if(figurenMoves.figur.istWeiss){
+          whiteKingPosition = [randomMove[0],randomMove[1]];
+        }
+        else{
+          blackKingPosition = [randomMove[0],randomMove[1]];
+        }
+
+      }
+
+
+      // en passant prüfen
+      if(figurenMoves.figur.art == Schachfigurenart.BAUER && isEnPassantPosible(figurenMoves.figur, figurenMoves.row, figurenMoves.col)){
+        var geschlagenerBauer = brett[moveInfos!.newRow][moveInfos!.newCol];
+
+        if (geschlagenerBauer!.istWeiss) {
+          weisseFigurenRaus.add(geschlagenerBauer);
+        } else {
+          schwarzeFigurenRaus.add(geschlagenerBauer);
+        }
+
+        brett[moveInfos!.newRow][moveInfos!.newCol] = null;
+      }
+
+
+      moveInfos = MoveInfos(
+          oldRow: figurenMoves.row,
+          oldCol: figurenMoves.col,
+          newRow: randomMove[0],
+          newCol: randomMove[1],
+          figur: Schachfigur(art: figurenMoves.figur.art, istWeiss: figurenMoves.figur.istWeiss, isEnemy: figurenMoves.figur.isEnemy));
+
+      brett[randomMove[0]][randomMove[1]] = figurenMoves.figur;
+      brett[figurenMoves.row][figurenMoves.col] = null;
+
+      setState(() {});
+
+      if(isCheckMate(!isWhiteTurn)){
+
+        String text="";
+        if(isWhiteTurn == figurenfarbe){
+          text="Du hast gewonnen!";
+        }
+        else{
+          if(figurenfarbe){
+            text= "Schwarz hat gewonnen!";
+          }
+          else{
+            text= "Weiß hat gewonnen!";
+          }
+        }
+
+        await warten(const Duration(seconds: 1, milliseconds: 500));
+
+        await  showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (BuildContext context) {
+          return DialogSpielende(spielende: Spielende.SCHACHMATT,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: text, onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+          await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
+        },
+        );
+        return;
+      }
+      else if(isStaleMate(!isWhiteTurn)){
+
+        await warten(const Duration(seconds: 1, milliseconds: 500));
+
+        await  showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (BuildContext context) {
+          return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Patt!", onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+          await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
+        },
+        );
+        return;
+      }
+
+
+      if(isKingInCheck(!isWhiteTurn)){
+        checkStatus = true;
+        showWarning(context: context, text: "Schach!", duration: const Duration(seconds: 2));
+      }
+      else{
+        checkStatus = false;
+      }
+
+    }
 
 
   List<List<int>> calculateRealValidMoves(int row, int col, Schachfigur? schachfigur, bool checkSimulation){
@@ -801,13 +947,18 @@ class _SpielBrettState extends State<SpielBrett> {
   }
 
 
-  void resetGame(){
+  Future<void> resetGame() async {
 
     Navigator.pop(context);
 
     setState(() {
       _startSpielbrett();
     });
+
+    if(figurenfarbe == false){
+     await computerMove();
+      isWhiteTurn = !isWhiteTurn;
+    }
 
   }
 
@@ -889,7 +1040,7 @@ class _SpielBrettState extends State<SpielBrett> {
                 ),
               ),
 
-              checkStatus ? const Text("Check!") : Container(),
+             // checkStatus ? showWarning(context: context, text: "Schach!", duration: const Duration(seconds: 1)) : Container(),
 
               Container(
                 color: backgroundColor,
@@ -908,9 +1059,12 @@ class _SpielBrettState extends State<SpielBrett> {
                           selectedRow == row && selectedColumn == col;
 
                       bool isValidMove = false;
-
+                      bool canBeTakeOut= false;
                       for (var position in validMoves) {
                         if (position[0] == row && position[1] == col) {
+                          if(brett[position[0]][position[1]] != null){
+                            canBeTakeOut= true;
+                          }
                           isValidMove = true;
                         }
                       }
@@ -944,6 +1098,7 @@ class _SpielBrettState extends State<SpielBrett> {
                         figur: brett[row][col],
                         ausgewaehlt: ausgewaehlt,
                         isValidMove: isValidMove,
+                        canBeTakenOut: canBeTakeOut,
                         lastMoveFrom: lastMoveFrom,
                         lastMoveTo: lastMoveTo,
                         kingInCheck: kingInCheck,
@@ -984,4 +1139,10 @@ class _SpielBrettState extends State<SpielBrett> {
         ),
       );
   }
+
+
+  Future<void> warten(Duration duration) async {
+    await Future.delayed(duration);
+  }
+
 }

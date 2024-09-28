@@ -10,6 +10,7 @@ class Feld extends StatelessWidget{
   final Schachfigur? figur;
   final bool ausgewaehlt;
   final bool isValidMove;
+  final bool canBeTakenOut;
   final bool lastMoveFrom;
   final bool lastMoveTo;
   final bool kingInCheck;
@@ -22,6 +23,7 @@ class Feld extends StatelessWidget{
     required this.figur,
     required this.ausgewaehlt,
     required this.isValidMove,
+    required this.canBeTakenOut,
     required this.lastMoveFrom,
     required this.lastMoveTo,
     required this.kingInCheck,
@@ -37,14 +39,17 @@ class Feld extends StatelessWidget{
     if(ausgewaehlt){
       feldFarbe= Colors.green;
     }
+    else if(canBeTakenOut){
+      feldFarbe= Colors.red[100];
+    }
     else if(isValidMove){
       feldFarbe= Colors.green[200];
     }
     else if(lastMoveFrom){
-      feldFarbe= Colors.yellow[300];
+      feldFarbe= Colors.yellow[100];
     }
     else if(lastMoveTo){
-      feldFarbe= Colors.yellow[200];
+   feldFarbe= Colors.yellow[200];
     }
     else if(isCheckmate){
       feldFarbe= Colors.red;
