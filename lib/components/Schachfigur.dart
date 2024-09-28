@@ -7,11 +7,13 @@ final Schachfigurenart art;
 final bool istWeiss;
 final bool isEnemy;
 late final String bild;
+bool? hasMoved;
 
 Schachfigur({
   required this.art,
   required this.istWeiss,
-  required this.isEnemy
+  required this.isEnemy,
+  this.hasMoved,
 }){
 
   switch (art) {
