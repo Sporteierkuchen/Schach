@@ -34,3 +34,7 @@ bool isRochade(int oldCol, newCol){
   return false;
 
 }
+
+Future<void> warten(Duration duration) async {
+  await Future.delayed(duration);
+}

@@ -1,7 +1,8 @@
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:schach/components/Enums.dart';
+import 'package:schach/components/Schachfigur.dart';
+import 'Toast.dart';
 
 class DialogSpielende extends StatelessWidget{
 
@@ -244,6 +245,193 @@ class DialogSpielabbruch extends StatelessWidget{
           ),
 
         ],
+      );
+
+  }
+
+}
+
+class DialogBauernUmwandlung extends StatefulWidget {
+
+  final bool isWhite;
+  final bool isEnemy;
+
+  final Function(Schachfigur) onReturnValue;
+
+   const DialogBauernUmwandlung({super.key, required this.isWhite, required this.isEnemy, required this.onReturnValue});
+
+  @override
+  State<StatefulWidget> createState() => _DialogBauernUmwandlungState();
+}
+
+
+class _DialogBauernUmwandlungState extends State<DialogBauernUmwandlung>{
+
+  List<Schachfigur> figurenListe = <Schachfigur>[];
+  Schachfigur? selectedFigur;
+
+
+    @override
+  void initState() {
+    super.initState();
+
+    figurenListe.add(Schachfigur(art: Schachfigurenart.DAME, istWeiss: widget.isWhite, isEnemy: widget.isEnemy));
+    figurenListe.add(Schachfigur(art: Schachfigurenart.TURM, istWeiss: widget.isWhite, isEnemy: widget.isEnemy,hasMoved: true));
+    figurenListe.add(Schachfigur(art: Schachfigurenart.SPRINGER, istWeiss: widget.isWhite, isEnemy: widget.isEnemy));
+    figurenListe.add(Schachfigur(art: Schachfigurenart.LAEUFER, istWeiss: widget.isWhite, isEnemy: widget.isEnemy));
+
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    return
+
+      PopScope(
+        canPop: false,
+        child: AlertDialog(
+          titlePadding: const EdgeInsets.only(left: 15, right: 20,top: 25,bottom: 20),
+          contentPadding: const EdgeInsets.only(left: 20,right: 20, top: 0, bottom: 0),
+          actionsPadding: const EdgeInsets.only(left: 20,right: 20, top: 10, bottom: 20),
+          title:
+          Container(
+            alignment: Alignment.center,
+            child:
+             Text(
+              "Bauer umwandeln!",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 35,
+                  height: 0,
+                  color: widget.isWhite ? Colors.black: Colors.white,
+                  fontWeight: FontWeight.bold),
+
+            ),
+          ),
+          surfaceTintColor: Colors.black,
+          backgroundColor: widget.isWhite ? Colors.white : Colors.black,
+          content:
+
+          Container(
+            width: MediaQuery.of(context).size.width,
+               height: MediaQuery.of(context).size.height,
+              color: Colors.transparent,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+
+                Center(
+                  child:
+
+                  Padding(
+                    padding: const EdgeInsets.only(left: 10,right: 10, bottom: 15,top: 0),
+                    child: Text(
+                      "Bauer umwandeln in",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 25,
+                          height: 0,
+                          color: widget.isWhite ? Colors.black38: Colors.white54,
+                          fontWeight: FontWeight.bold),
+
+                    ),
+                  ),
+                ),
+
+                ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: figurenListe.length,
+                    physics: const NeverScrollableScrollPhysics(),
+                    scrollDirection: Axis.vertical,
+                    itemBuilder: (context, index) {
+
+                      Schachfigur figur =figurenListe[index];
+
+                      return
+
+                        Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedFigur= figur;
+                              });
+                            },
+                            child:
+                            Container(
+                             // width:100,
+                              height: 100,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                  color: figur.istWeiss ? Colors.black38: Colors.white54,
+                                  borderRadius: BorderRadius.circular(15.0),
+                                  border: selectedFigur == figur ? Border.all(color: Colors.green,width: 5.0,) : Border.all(color: widget.isWhite ? Colors.black : Colors.white, width: 3.0,)
+                              ),
+                              child:
+                              Image.asset(
+                               figur.bild,
+                                color: figur.istWeiss ? Colors.white : Colors.black,
+                                scale: 0.5,
+                              )
+
+                            ),
+                          ),
+                        );
+
+                    }),
+
+              ],),
+          ),
+
+
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+
+                ElevatedButton(
+                  onPressed: (){
+
+                    if(selectedFigur != null){
+                      widget.onReturnValue(selectedFigur!);
+                    }
+                    else{
+                      showInfo(context: context, text: "Wähle die Figur aus, in die du den Bauern umwandeln möchtest!");
+                    }
+                    Navigator.pop(context);
+
+                  },
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: widget.isWhite ? Colors.black : Colors.white,
+                    side:  BorderSide(color: widget.isWhite ? Colors.white54: Colors.black38, width: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    // Text Color (Foreground color)
+                  ),
+                  child:
+                  Text(
+                    'OK',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 18,
+                        height: 0,
+                        color: widget.isWhite ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold
+                    ),
+                  ),
+                ),
+
+              ],
+            ),
+
+          ],
+        ),
       );
 
   }

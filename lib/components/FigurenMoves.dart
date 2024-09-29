@@ -4,7 +4,7 @@ class FigurenMoves{
 
   final int row;
   final int col;
-  final Schachfigur figur;
+  Schachfigur figur;
   final List<List<int>> pieceValidMoves;
 
   FigurenMoves({
