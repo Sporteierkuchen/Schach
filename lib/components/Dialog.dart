@@ -301,7 +301,7 @@ class _DialogBauernUmwandlungState extends State<DialogBauernUmwandlung>{
               "Bauer umwandeln!",
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 35,
+                  fontSize: 30,
                   height: 0,
                   color: widget.isWhite ? Colors.black: Colors.white,
                   fontWeight: FontWeight.bold),
@@ -329,7 +329,7 @@ class _DialogBauernUmwandlungState extends State<DialogBauernUmwandlung>{
                       "Bauer umwandeln in",
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 25,
+                          fontSize: 22,
                           height: 0,
                           color: widget.isWhite ? Colors.black38: Colors.white54,
                           fontWeight: FontWeight.bold),
@@ -360,7 +360,7 @@ class _DialogBauernUmwandlungState extends State<DialogBauernUmwandlung>{
                             child:
                             Container(
                              // width:100,
-                              height: 100,
+                              height: 80,
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                   color: figur.istWeiss ? Colors.black38: Colors.white54,

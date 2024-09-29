@@ -1231,7 +1231,7 @@ class _SpielBrettState extends State<SpielBrett> {
     return true;
 
   }
-  
+
   String koordinatenAnzeige(int row, int col) {
     if (figurenfarbe) {
       int r = 8 - row;
