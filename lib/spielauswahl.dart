@@ -21,7 +21,12 @@ class _SpielAuswahlState extends State<SpielAuswahl> {
     SpielArt(path: "assets/images/figuren/koenig_gold.png", figurenfarbe: 0),
   ];
 
+  List<int> spielModusListe = <int>[
+  0,1,-1
+  ];
+
   SpielArt? selectedSpielArt;
+  int? selectedSpielModus;
 
   @override
   void initState() {
@@ -164,11 +169,97 @@ class _SpielAuswahlState extends State<SpielAuswahl> {
             ),
 
             Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5,vertical: 10),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+
+                  const Center(
+                    child:
+
+                    Padding(
+                      padding: EdgeInsets.only(left: 10,right: 10, bottom: 5,top: 0),
+                      child: Text(
+                        "Spielmodus",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 16,
+                            height: 0,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.bold),
+
+                      ),
+                    ),
+                  ),
+
+                  Container(
+                    color: Colors.transparent,
+                    height: 70,
+                    alignment: Alignment.center,
+                    child:
+
+                    ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: spielartenListe.length,
+                        physics: const NeverScrollableScrollPhysics(),
+                        scrollDirection: Axis.horizontal,
+                        itemBuilder: (context, index) {
+
+                          int spielmodus =spielModusListe[index];
+
+                          return
+
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(5),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        selectedSpielModus= spielmodus;
+                                      });
+                                    },
+                                    child:
+                                    Container(
+                                      width: 60,
+                                      height: 60,
+                                      alignment:Alignment.center,
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                          color: Colors.white54,
+                                          borderRadius: BorderRadius.circular(15.0),
+                                          border: selectedSpielModus == spielmodus ? Border.all(color: Colors.green,width: 3.0,) : Border.all(color: Colors.black,width: 1.0,)
+                                      ),
+                                      child:
+                                       Text(
+                                        "$spielmodus",
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            fontSize: 30,
+                                            height: 0,
+                                            color: Colors.deepOrangeAccent,
+                                            fontWeight: FontWeight.bold),
+
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+
+                        }),
+                  ),
+
+                ],),
+            ),
+
+            Padding(
               padding: const EdgeInsets.only(left: 15, right: 15, top: 20, bottom: 50),
               child: ElevatedButton(
                 onPressed: ()  async {
 
-                  if(selectedSpielArt != null){
+                  if(selectedSpielArt != null && selectedSpielModus != null){
 
                   int spielfarbe= selectedSpielArt!.figurenfarbe;
 
@@ -179,15 +270,25 @@ class _SpielAuswahlState extends State<SpielAuswahl> {
                   }
 
                   if(spielfarbe==1){
-                    await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => SpielBrett(figurenfarbe: true,)));
+                    await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => SpielBrett(figurenfarbe: true, spielModus: selectedSpielModus!,)));
                   }
                   else{
-                    await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => SpielBrett(figurenfarbe: false,)));
+                    await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => SpielBrett(figurenfarbe: false, spielModus: selectedSpielModus!,)));
                   }
 
                   }
                   else{
-                    showInfo(context: context, text: "Wähle die Farbe deiner Figuren aus, mit denen du spielen willst!");
+
+                    if(selectedSpielArt == null && selectedSpielModus == null){
+                      showInfo(context: context, text: "Wähle die Farbe deiner Figuren aus und den Spielmodus!");
+                    }
+                    else if(selectedSpielArt == null){
+                      showInfo(context: context, text: "Wähle die Farbe deiner Figuren aus, mit denen du spielen willst!");
+                    }
+                    else if(selectedSpielModus == null){
+                      showInfo(context: context, text: "Wähle einen Spielmodus aus!");
+                    }
+
                   }
 
                 },
