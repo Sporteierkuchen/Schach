@@ -13,3 +13,24 @@ bool isInBoard(int row, int col){
   return row >= 0 && row <8 && col >= 0 && col < 8;
 
 }
+
+bool isShortCastle(int col){
+
+  if(col == 1 || col == 6){
+      return true;
+  }
+  else if(col == 2 || col == 5){
+    return false;
+  }
+  return false;
+}
+
+bool isRochade(int oldCol, newCol){
+
+  if((oldCol - newCol).abs() == 2){
+    return true;
+  }
+
+  return false;
+
+}

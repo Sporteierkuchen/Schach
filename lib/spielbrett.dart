@@ -54,8 +54,8 @@ class _SpielBrettState extends State<SpielBrett> {
     _startSpielbrett();
 
     if(figurenfarbe == false){
-      computerMove();
-      isWhiteTurn = !isWhiteTurn;
+      // computerMove();
+      // isWhiteTurn = !isWhiteTurn;
     }
 
   }
@@ -241,8 +241,8 @@ class _SpielBrettState extends State<SpielBrett> {
   void figurAusgewaehlt(int row, int column) {
     setState(() {
       if (ausgewaehlteFigur == null && brett[row][column] != null) {
-        // if (brett[row][column]!.istWeiss == isWhiteTurn) {
-          if (brett[row][column]!.istWeiss == isWhiteTurn && !brett[row][column]!.isEnemy) {
+         if (brett[row][column]!.istWeiss == isWhiteTurn) {
+         // if (brett[row][column]!.istWeiss == isWhiteTurn && !brett[row][column]!.isEnemy) {
           ausgewaehlteFigur = brett[row][column];
           selectedRow = row;
           selectedColumn = column;
@@ -269,84 +269,22 @@ class _SpielBrettState extends State<SpielBrett> {
 
   Future<void> bewegeFigur(int newRow, int newCol) async {
 
-    if (brett[newRow][newCol] != null) {
-      var geschlageneFigur = brett[newRow][newCol];
-
-      if (geschlageneFigur!.istWeiss) {
-        weisseFigurenRaus.add(geschlageneFigur);
-      } else {
-        schwarzeFigurenRaus.add(geschlageneFigur);
-      }
-    }
-
+    figurGeschlagenPruefung(newRow, newCol);
     print("Bewege: ${ausgewaehlteFigur.toString()} von ${koordinatenAnzeige(selectedRow, selectedColumn)} zu ${koordinatenAnzeige(newRow, newCol)}");
 
     if(ausgewaehlteFigur!.art == Schachfigurenart.KOENIG){
-
-      // kurze Rochade prüfen
-      if(!ausgewaehlteFigur!.isEnemy && ausgewaehlteFigur!.istWeiss && isShortCastlePossible(ausgewaehlteFigur!) && (whiteKingPosition[1] - newCol).abs() == 2){
-
-        Schachfigur rochierterTurm=brett[7][7]!;
-        brett[7][5]= rochierterTurm;
-        brett[7][7]= null;
-
-      }
-      else if(!ausgewaehlteFigur!.isEnemy && !ausgewaehlteFigur!.istWeiss && isShortCastlePossible(ausgewaehlteFigur!) && (blackKingPosition[1] - newCol).abs() == 2){
-        Schachfigur rochierterTurm=brett[7][0]!;
-        brett[7][2]= rochierterTurm;
-        brett[7][0]= null;
-      }
-      else if(ausgewaehlteFigur!.isEnemy && ausgewaehlteFigur!.istWeiss && isShortCastlePossible(ausgewaehlteFigur!) && (whiteKingPosition[1] - newCol).abs() == 2){
-
-        Schachfigur rochierterTurm=brett[0][0]!;
-        brett[0][2]= rochierterTurm;
-        brett[0][0]= null;
-
-      }
-      else if(ausgewaehlteFigur!.isEnemy && !ausgewaehlteFigur!.istWeiss && isShortCastlePossible(ausgewaehlteFigur!) && (blackKingPosition[1] - newCol).abs() == 2){
-
-        Schachfigur rochierterTurm=brett[0][7]!;
-        brett[0][5]= rochierterTurm;
-        brett[0][7]= null;
-
-      }
-
-
-      if(ausgewaehlteFigur!.hasMoved== false){
-        ausgewaehlteFigur!.hasMoved= true;
-      }
-
-
-      if(ausgewaehlteFigur!.istWeiss){
-        whiteKingPosition = [newRow,newCol];
-      }
-      else{
-        blackKingPosition = [newRow,newCol];
-      }
-
+      checkKingMove(ausgewaehlteFigur!, newRow, newCol);
     }
 
     //Wenn Turm bewegt ist Rochade auf seiner Seite nicht mehr möglich
     if(ausgewaehlteFigur!.art == Schachfigurenart.TURM){
-      if(ausgewaehlteFigur!.hasMoved== false){
-        ausgewaehlteFigur!.hasMoved= true;
-      }
+      checkTurmMove(ausgewaehlteFigur!);
     }
-
 
     // en passant prüfen
-    if(ausgewaehlteFigur!.art == Schachfigurenart.BAUER && isEnPassantPosible(ausgewaehlteFigur!, selectedRow, selectedColumn) && selectedColumn != newCol){
-      var geschlagenerBauer = brett[moveInfos!.newRow][moveInfos!.newCol];
-
-      if (geschlagenerBauer!.istWeiss) {
-        weisseFigurenRaus.add(geschlagenerBauer);
-      } else {
-        schwarzeFigurenRaus.add(geschlagenerBauer);
-      }
-
-      brett[moveInfos!.newRow][moveInfos!.newCol] = null;
+    if(ausgewaehlteFigur!.art == Schachfigurenart.BAUER){
+        checkBauerMove(ausgewaehlteFigur!, selectedRow, selectedColumn, newRow, newCol);
     }
-
 
     moveInfos = MoveInfos(
         oldRow: selectedRow,
@@ -419,11 +357,119 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
       isWhiteTurn = !isWhiteTurn;
-      await computerMove();
-      isWhiteTurn = !isWhiteTurn;
+      // await computerMove();
+      // isWhiteTurn = !isWhiteTurn;
 
   }
 
+  Future<void> computerMove() async {
+
+    List<FigurenMoves> allPosibleEnemyMoves=[];
+
+    for(int i = 0; i < 8; i++){
+      for(int j = 0; j < 8; j++){
+
+        if(brett[i][j] == null || !brett[i][j]!.isEnemy){
+          continue;
+        }
+
+        List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j],true);
+
+        if(pieceValidMoves.isNotEmpty){
+          allPosibleEnemyMoves.add(FigurenMoves(row: i, col: j, figur: brett[i][j]!, pieceValidMoves: pieceValidMoves));
+        }
+
+      }
+    }
+
+    Random zufall = Random();
+    FigurenMoves figurenMoves= allPosibleEnemyMoves[zufall.nextInt(allPosibleEnemyMoves.length)];
+    List<int> randomMove= figurenMoves.pieceValidMoves[zufall.nextInt(figurenMoves.pieceValidMoves.length)];
+
+
+    await warten(const Duration(seconds: 1, milliseconds: 500));
+
+    figurGeschlagenPruefung(randomMove[0], randomMove[1]);
+    print("Gegner bewegt: ${figurenMoves.figur.toString()} von ${koordinatenAnzeige(figurenMoves.row, figurenMoves.col)} zu ${koordinatenAnzeige(randomMove[0], randomMove[1])}");
+
+    if(figurenMoves.figur.art == Schachfigurenart.KOENIG){
+      checkKingMove(figurenMoves.figur, randomMove[0], randomMove[1]);
+    }
+
+    //Wenn Turm bewegt ist Rochade auf seiner Seite nicht mehr möglich
+    if(figurenMoves.figur.art == Schachfigurenart.TURM){
+      checkTurmMove(figurenMoves.figur);
+    }
+
+    // en passant prüfen
+    if(figurenMoves.figur.art == Schachfigurenart.BAUER){
+      checkBauerMove(figurenMoves.figur, figurenMoves.row, figurenMoves.col, randomMove[0], randomMove[1]);
+    }
+
+    moveInfos = MoveInfos(
+        oldRow: figurenMoves.row,
+        oldCol: figurenMoves.col,
+        newRow: randomMove[0],
+        newCol: randomMove[1],
+        figur: Schachfigur(art: figurenMoves.figur.art, istWeiss: figurenMoves.figur.istWeiss, isEnemy: figurenMoves.figur.isEnemy));
+
+    brett[randomMove[0]][randomMove[1]] = figurenMoves.figur;
+    brett[figurenMoves.row][figurenMoves.col] = null;
+
+    setState(() {});
+
+    if(isCheckMate(!isWhiteTurn)){
+
+      String text="";
+      if(isWhiteTurn == figurenfarbe){
+        text="Du hast gewonnen!";
+      }
+      else{
+        if(figurenfarbe){
+          text= "Schwarz hat gewonnen!";
+        }
+        else{
+          text= "Weiß hat gewonnen!";
+        }
+      }
+
+      await warten(const Duration(seconds: 1, milliseconds: 500));
+
+      await  showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (BuildContext context) {
+          return DialogSpielende(spielende: Spielende.SCHACHMATT,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: text, onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+          await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
+        },
+      );
+      return;
+    }
+    else if(isStaleMate(!isWhiteTurn)){
+
+      await warten(const Duration(seconds: 1, milliseconds: 500));
+
+      await  showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (BuildContext context) {
+          return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Patt!", onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+          await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
+        },
+      );
+      return;
+    }
+
+
+    if(isKingInCheck(!isWhiteTurn)){
+      checkStatus = true;
+      showWarning(context: context, text: "Schach!", duration: const Duration(seconds: 2));
+    }
+    else{
+      checkStatus = false;
+    }
+
+  }
 
   List<List<int>> calculateRawValidMoves(int row, int col, Schachfigur? schachfigur) {
     List<List<int>> canidateMoves = [];
@@ -646,7 +692,7 @@ class _SpielBrettState extends State<SpielBrett> {
           canidateMoves.add([newRow, newCol]);
         }
 
-
+        // Short castle
         if(schachfigur.isEnemy && schachfigur.istWeiss && isShortCastlePossible(schachfigur) && row== 0 && col== 3){
           canidateMoves.add([0,1]);
         }
@@ -658,6 +704,20 @@ class _SpielBrettState extends State<SpielBrett> {
         }
         else if(!schachfigur.isEnemy && !schachfigur.istWeiss && isShortCastlePossible(schachfigur) && row== 7 && col== 3){
           canidateMoves.add([7,1]);
+        }
+
+        // Long castle
+        if(schachfigur.isEnemy && schachfigur.istWeiss && isLongCastlePossible(schachfigur) && row== 0 && col== 3){
+          canidateMoves.add([0,5]);
+        }
+        else if(schachfigur.isEnemy && !schachfigur.istWeiss && isLongCastlePossible(schachfigur) && row== 0 && col== 4){
+          canidateMoves.add([0,2]);
+        }
+        else if(!schachfigur.isEnemy && schachfigur.istWeiss && isLongCastlePossible(schachfigur) && row== 7 && col== 4){
+          canidateMoves.add([7,2]);
+        }
+        else if(!schachfigur.isEnemy && !schachfigur.istWeiss && isLongCastlePossible(schachfigur) && row== 7 && col== 3){
+          canidateMoves.add([7,5]);
         }
 
         break;
@@ -723,177 +783,151 @@ class _SpielBrettState extends State<SpielBrett> {
 
   }
 
+  bool isLongCastlePossible(Schachfigur schachfigur){
 
-    Future<void> computerMove() async {
+    if(schachfigur.isEnemy && !schachfigur.hasMoved!){
 
-      List<FigurenMoves> allPosibleEnemyMoves=[];
-
-      for(int i = 0; i < 8; i++){
-        for(int j = 0; j < 8; j++){
-
-          if(brett[i][j] == null || !brett[i][j]!.isEnemy){
-            continue;
-          }
-
-          List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j],true);
-
-          if(pieceValidMoves.isNotEmpty){
-            allPosibleEnemyMoves.add(FigurenMoves(row: i, col: j, figur: brett[i][j]!, pieceValidMoves: pieceValidMoves));
-          }
-
+      if(schachfigur.istWeiss && brett[0][7]!= null && brett[0][7]!.art == Schachfigurenart.TURM &&  !brett[0][7]!.hasMoved!){
+        //Weißer König Feind 0,3
+        if(brett[0][4] == null && brett[0][5] == null && brett[0][6] == null){
+          return true;
         }
+
       }
-
-      Random zufall = Random();
-      FigurenMoves figurenMoves= allPosibleEnemyMoves[zufall.nextInt(allPosibleEnemyMoves.length)];
-      List<int> randomMove= figurenMoves.pieceValidMoves[zufall.nextInt(figurenMoves.pieceValidMoves.length)];
-
-
-      await warten(const Duration(seconds: 1, milliseconds: 500));
-
-
-      if (brett[randomMove[0]][randomMove[1]] != null) {
-        var geschlageneFigur = brett[randomMove[0]][randomMove[1]];
-
-        if (geschlageneFigur!.istWeiss) {
-          weisseFigurenRaus.add(geschlageneFigur);
-        } else {
-          schwarzeFigurenRaus.add(geschlageneFigur);
-        }
-      }
-
-       print("Gegner bewegt: ${figurenMoves.figur.toString()} von ${koordinatenAnzeige(figurenMoves.row, figurenMoves.col)} zu ${koordinatenAnzeige(randomMove[0], randomMove[1])}");
-
-      if(figurenMoves.figur.art == Schachfigurenart.KOENIG){
-
-        // kurze Rochade prüfen
-        if(figurenMoves.figur.isEnemy && figurenMoves.figur.istWeiss && isShortCastlePossible(figurenMoves.figur) && (whiteKingPosition[1] - randomMove[1]).abs() == 2){
-
-          Schachfigur rochierterTurm=brett[0][0]!;
-          brett[0][2]= rochierterTurm;
-          brett[0][0]= null;
-
-        }
-        else if(figurenMoves.figur.isEnemy && !figurenMoves.figur.istWeiss && isShortCastlePossible(figurenMoves.figur) && (blackKingPosition[1] - randomMove[1]).abs() == 2){
-
-          Schachfigur rochierterTurm=brett[0][7]!;
-          brett[0][5]= rochierterTurm;
-          brett[0][7]= null;
-
-        }
-        else if(!figurenMoves.figur.isEnemy && figurenMoves.figur.istWeiss && isShortCastlePossible(figurenMoves.figur) && (whiteKingPosition[1] - randomMove[1]).abs() == 2){
-
-          Schachfigur rochierterTurm=brett[7][7]!;
-          brett[7][5]= rochierterTurm;
-          brett[7][7]= null;
-
-        }
-        else if(!figurenMoves.figur.isEnemy && !figurenMoves.figur.istWeiss && isShortCastlePossible(figurenMoves.figur) && (blackKingPosition[1] - randomMove[1]).abs() == 2){
-          Schachfigur rochierterTurm=brett[7][0]!;
-          brett[7][2]= rochierterTurm;
-          brett[7][0]= null;
-        }
-
-
-        if(figurenMoves.figur.hasMoved== false){
-          figurenMoves.figur.hasMoved= true;
-        }
-
-
-        if(figurenMoves.figur.istWeiss){
-          whiteKingPosition = [randomMove[0],randomMove[1]];
-        }
-        else{
-          blackKingPosition = [randomMove[0],randomMove[1]];
+      else if(!schachfigur.istWeiss && brett[0][0]!= null && brett[0][0]!.art == Schachfigurenart.TURM && !brett[0][0]!.hasMoved!){
+        //Schwarzer König Feind 0,4
+        if(brett[0][3] == null && brett[0][2] == null && brett[0][1] == null){
+          return true;
         }
 
       }
 
-      //Wenn Turm bewegt ist Rochade auf seiner Seite nicht mehr möglich
-      if(figurenMoves.figur.art == Schachfigurenart.TURM){
-        if(figurenMoves.figur.hasMoved== false){
-          figurenMoves.figur.hasMoved= true;
-        }
-      }
+    }
+    else if(!schachfigur.isEnemy && !schachfigur.hasMoved!){
 
-      // en passant prüfen
-      if(figurenMoves.figur.art == Schachfigurenart.BAUER && isEnPassantPosible(figurenMoves.figur, figurenMoves.row, figurenMoves.col) && figurenMoves.col != randomMove[1]){
-        var geschlagenerBauer = brett[moveInfos!.newRow][moveInfos!.newCol];
-
-        if (geschlagenerBauer!.istWeiss) {
-          weisseFigurenRaus.add(geschlagenerBauer);
-        } else {
-          schwarzeFigurenRaus.add(geschlagenerBauer);
+      if(schachfigur.istWeiss && brett[7][0]!= null && brett[7][0]!.art == Schachfigurenart.TURM && !brett[7][0]!.hasMoved!){
+        //Weißer König Freund 7,4
+        if(brett[7][3] == null && brett[7][2] == null && brett[7][1] == null){
+          return true;
         }
 
-        brett[moveInfos!.newRow][moveInfos!.newCol] = null;
       }
-
-      moveInfos = MoveInfos(
-          oldRow: figurenMoves.row,
-          oldCol: figurenMoves.col,
-          newRow: randomMove[0],
-          newCol: randomMove[1],
-          figur: Schachfigur(art: figurenMoves.figur.art, istWeiss: figurenMoves.figur.istWeiss, isEnemy: figurenMoves.figur.isEnemy));
-
-      brett[randomMove[0]][randomMove[1]] = figurenMoves.figur;
-      brett[figurenMoves.row][figurenMoves.col] = null;
-
-      setState(() {});
-
-      if(isCheckMate(!isWhiteTurn)){
-
-        String text="";
-        if(isWhiteTurn == figurenfarbe){
-          text="Du hast gewonnen!";
-        }
-        else{
-          if(figurenfarbe){
-            text= "Schwarz hat gewonnen!";
-          }
-          else{
-            text= "Weiß hat gewonnen!";
-          }
+      else if(!schachfigur.istWeiss && brett[7][7]!= null && brett[7][7]!.art == Schachfigurenart.TURM && !brett[7][7]!.hasMoved!){
+        //Schwarzer König Freund 7,3
+        if(brett[7][4] == null && brett[7][5] == null && brett[7][6] == null){
+          return true;
         }
 
-        await warten(const Duration(seconds: 1, milliseconds: 500));
-
-        await  showDialog(
-        barrierDismissible: false,
-        context: context,
-        builder: (BuildContext context) {
-          return DialogSpielende(spielende: Spielende.SCHACHMATT,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: text, onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
-          await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
-        },
-        );
-        return;
-      }
-      else if(isStaleMate(!isWhiteTurn)){
-
-        await warten(const Duration(seconds: 1, milliseconds: 500));
-
-        await  showDialog(
-        barrierDismissible: false,
-        context: context,
-        builder: (BuildContext context) {
-          return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Patt!", onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
-          await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
-        },
-        );
-        return;
-      }
-
-
-      if(isKingInCheck(!isWhiteTurn)){
-        checkStatus = true;
-        showWarning(context: context, text: "Schach!", duration: const Duration(seconds: 2));
-      }
-      else{
-        checkStatus = false;
       }
 
     }
 
+    return false;
+
+  }
+
+  void checkKingMove(Schachfigur king, int newRow, newCol){
+
+    // Rochade prüfen
+    if(!king.isEnemy && king.istWeiss && isRochade(whiteKingPosition[1], newCol)){
+      if(isShortCastle(newCol)){
+        Schachfigur rochierterTurm=brett[7][7]!;
+        brett[7][5]= rochierterTurm;
+        brett[7][7]= null;
+      }
+      else{
+        Schachfigur rochierterTurm=brett[7][0]!;
+        brett[7][3]= rochierterTurm;
+        brett[7][0]= null;
+      }
+    }
+    else if(!king.isEnemy && !king.istWeiss && isRochade(blackKingPosition[1], newCol)){
+      if(isShortCastle(newCol)){
+        Schachfigur rochierterTurm=brett[7][0]!;
+        brett[7][2]= rochierterTurm;
+        brett[7][0]= null;
+      }
+      else{
+        Schachfigur rochierterTurm=brett[7][7]!;
+        brett[7][4]= rochierterTurm;
+        brett[7][7]= null;
+      }
+    }
+    else if(king.isEnemy && king.istWeiss && isRochade(whiteKingPosition[1], newCol)){
+      if(isShortCastle(newCol)){
+        Schachfigur rochierterTurm=brett[0][0]!;
+        brett[0][2]= rochierterTurm;
+        brett[0][0]= null;
+      }
+      else{
+        Schachfigur rochierterTurm=brett[0][7]!;
+        brett[0][4]= rochierterTurm;
+        brett[0][7]= null;
+      }
+    }
+    else if(king.isEnemy && !king.istWeiss && isRochade(blackKingPosition[1], newCol)){
+      if(isShortCastle(newCol)){
+        Schachfigur rochierterTurm=brett[0][7]!;
+        brett[0][5]= rochierterTurm;
+        brett[0][7]= null;
+      }
+      else{
+        Schachfigur rochierterTurm=brett[0][0]!;
+        brett[0][3]= rochierterTurm;
+        brett[0][0]= null;
+      }
+    }
+
+    if(king.hasMoved== false){
+      king.hasMoved= true;
+    }
+
+
+    if(king.istWeiss){
+      whiteKingPosition = [newRow,newCol];
+    }
+    else{
+      blackKingPosition = [newRow,newCol];
+    }
+
+  }
+
+  void checkBauerMove(Schachfigur bauer, int row, int col, int newRow, int newCol){
+
+    // en passant prüfen
+    if(isEnPassantPosible(bauer, row, col)  && newCol == moveInfos!.newCol){
+      var geschlagenerBauer = brett[moveInfos!.newRow][moveInfos!.newCol];
+
+      if (geschlagenerBauer!.istWeiss) {
+        weisseFigurenRaus.add(geschlagenerBauer);
+      } else {
+        schwarzeFigurenRaus.add(geschlagenerBauer);
+      }
+
+      brett[moveInfos!.newRow][moveInfos!.newCol] = null;
+    }
+
+  }
+
+  void checkTurmMove(Schachfigur turm){
+    if(turm.hasMoved== false){
+      turm.hasMoved= true;
+    }
+  }
+
+  void figurGeschlagenPruefung(int newRow, int newCol){
+
+    if (brett[newRow][newCol] != null) {
+      var geschlageneFigur = brett[newRow][newCol];
+
+      if (geschlageneFigur!.istWeiss) {
+        weisseFigurenRaus.add(geschlageneFigur);
+      } else {
+        schwarzeFigurenRaus.add(geschlageneFigur);
+      }
+    }
+
+  }
 
   List<List<int>> calculateRealValidMoves(int row, int col, Schachfigur? schachfigur, bool checkSimulation){
 
