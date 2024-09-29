@@ -241,7 +241,8 @@ class _SpielBrettState extends State<SpielBrett> {
   void figurAusgewaehlt(int row, int column) {
     setState(() {
       if (ausgewaehlteFigur == null && brett[row][column] != null) {
-        if (brett[row][column]!.istWeiss == isWhiteTurn && !brett[row][column]!.isEnemy) {
+        // if (brett[row][column]!.istWeiss == isWhiteTurn) {
+          if (brett[row][column]!.istWeiss == isWhiteTurn && !brett[row][column]!.isEnemy) {
           ausgewaehlteFigur = brett[row][column];
           selectedRow = row;
           selectedColumn = column;
@@ -295,6 +296,21 @@ class _SpielBrettState extends State<SpielBrett> {
         brett[7][2]= rochierterTurm;
         brett[7][0]= null;
       }
+      else if(ausgewaehlteFigur!.isEnemy && ausgewaehlteFigur!.istWeiss && isShortCastlePossible(ausgewaehlteFigur!) && (whiteKingPosition[1] - newCol).abs() == 2){
+
+        Schachfigur rochierterTurm=brett[0][0]!;
+        brett[0][2]= rochierterTurm;
+        brett[0][0]= null;
+
+      }
+      else if(ausgewaehlteFigur!.isEnemy && !ausgewaehlteFigur!.istWeiss && isShortCastlePossible(ausgewaehlteFigur!) && (blackKingPosition[1] - newCol).abs() == 2){
+
+        Schachfigur rochierterTurm=brett[0][7]!;
+        brett[0][5]= rochierterTurm;
+        brett[0][7]= null;
+
+      }
+
 
       if(ausgewaehlteFigur!.hasMoved== false){
         ausgewaehlteFigur!.hasMoved= true;
@@ -765,6 +781,19 @@ class _SpielBrettState extends State<SpielBrett> {
           brett[0][7]= null;
 
         }
+        else if(!figurenMoves.figur.isEnemy && figurenMoves.figur.istWeiss && isShortCastlePossible(figurenMoves.figur) && (whiteKingPosition[1] - randomMove[1]).abs() == 2){
+
+          Schachfigur rochierterTurm=brett[7][7]!;
+          brett[7][5]= rochierterTurm;
+          brett[7][7]= null;
+
+        }
+        else if(!figurenMoves.figur.isEnemy && !figurenMoves.figur.istWeiss && isShortCastlePossible(figurenMoves.figur) && (blackKingPosition[1] - randomMove[1]).abs() == 2){
+          Schachfigur rochierterTurm=brett[7][0]!;
+          brett[7][2]= rochierterTurm;
+          brett[7][0]= null;
+        }
+
 
         if(figurenMoves.figur.hasMoved== false){
           figurenMoves.figur.hasMoved= true;
@@ -931,7 +960,15 @@ class _SpielBrettState extends State<SpielBrett> {
       //Spezialfall Rochade
       if((originalKingPosition[1] - endCol).abs() == 2){
 
+        if(figur.istWeiss){
+          whiteKingPosition = originalKingPosition;
+        }
+        else{
+          blackKingPosition = originalKingPosition;
+        }
+
         if(isKingInCheck(figur.istWeiss)){
+          print("King check no castle");
           if(figur.istWeiss){
             whiteKingPosition = originalKingPosition;
           }
