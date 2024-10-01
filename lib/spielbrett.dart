@@ -727,7 +727,22 @@ class _SpielBrettState extends State<SpielBrett> {
           );
           return true;
         }
+        else if(isFigurenMangel()){
 
+          pause=true;
+          await warten(const Duration(seconds: 4, milliseconds: 500));
+          pause=false;
+
+          await  showDialog(
+            barrierDismissible: false,
+            context: context,
+            builder: (BuildContext context) {
+              return DialogSpielende(spielende: Spielende.REMIS,isWhiteTurn: isWhiteTurn, figurenfarbe: figurenfarbe, text: "Unentschieden durch Figurenmangel!", onTapNochmal:  () {resetGame();}, onTapBack:  () async {   Navigator.pop(context);
+              await Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SpielAuswahl()));});
+            },
+          );
+          return true;
+        }
 
         if(isKingInCheck(!isWhiteTurn)){
           checkStatus = true;
@@ -1229,6 +1244,71 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
     return true;
+
+  }
+
+  bool isFigurenMangel(){
+
+    int bauernCounter=0;
+    int blackSpringerCounter=0;
+    int whiteSpringerCounter=0;
+    int blackLaeuferCounter=0;
+    int whiteLaeuferCounter=0;
+    int turmCounter=0;
+    int dameCounter=0;
+
+    for(int i = 0; i < 8; i++){
+      for(int j = 0; j < 8; j++){
+
+        if(brett[i][j] == null || brett[i][j]!.art == Schachfigurenart.KOENIG){
+          continue;
+        }
+
+        Schachfigur? figur =  brett[i][j];
+        switch (figur!.art) {
+          case Schachfigurenart.BAUER:
+            bauernCounter++;
+          case Schachfigurenart.SPRINGER:
+            if(figur.istWeiss){
+              whiteSpringerCounter++;
+            }
+            else{
+              blackSpringerCounter++;
+            }
+          case Schachfigurenart.LAEUFER:
+            if(figur.istWeiss){
+                  whiteLaeuferCounter++;
+            }
+            else{
+                  blackLaeuferCounter++;
+            }
+          case Schachfigurenart.TURM:
+           turmCounter++;
+          case Schachfigurenart.DAME:
+           dameCounter++;
+          default:
+        }
+
+      }
+    }
+
+    if(bauernCounter ==0 && turmCounter==0 && dameCounter==0 && (whiteSpringerCounter+blackSpringerCounter+whiteLaeuferCounter+blackLaeuferCounter <=2)){
+      if(blackLaeuferCounter == 2 || whiteLaeuferCounter==2 || whiteLaeuferCounter+whiteLaeuferCounter==2 || blackLaeuferCounter+blackSpringerCounter==2){
+        return false;
+      }
+
+      return true;
+    }
+
+    if(bauernCounter ==0 && turmCounter==0 && dameCounter==0 && (whiteSpringerCounter+blackSpringerCounter+whiteLaeuferCounter+blackLaeuferCounter ==3)){
+      if(blackSpringerCounter == 2 || whiteSpringerCounter==2 ){
+        return true;
+      }
+
+      return false;
+    }
+
+    return false;
 
   }
 
