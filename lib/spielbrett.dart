@@ -338,7 +338,8 @@ class _SpielBrettState extends State<SpielBrett> {
       validMoves = [];
     });
 
-
+    print("Weißer König: $whiteKingPosition");
+    print("Schwarzer König: $blackKingPosition");
 
     if(spielModus==0){
 
@@ -463,6 +464,9 @@ class _SpielBrettState extends State<SpielBrett> {
     brett[figurenMoves.row][figurenMoves.col] = null;
 
     setState(() {});
+
+    print("Weißer König: $whiteKingPosition");
+    print("Schwarzer König: $blackKingPosition");
 
     return await checkSpielEnde();
 
