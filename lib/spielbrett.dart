@@ -54,19 +54,7 @@ class _SpielBrettState extends State<SpielBrett> {
     figurenfarbe = widget.figurenfarbe;
     spielModus = widget.spielModus;
 
-    _startSpielbrett();
-
-    if(figurenfarbe == false && spielModus==0){
-      computerMove();
-      isWhiteTurn = !isWhiteTurn;
-    }
-    else if(spielModus == -1){
-
-      WidgetsBinding.instance.addPostFrameCallback((_){
-        computerVsComputer();
-      });
-
-    }
+      startNewGame();
 
   }
 
@@ -1388,6 +1376,12 @@ class _SpielBrettState extends State<SpielBrett> {
 
     Navigator.pop(context);
 
+     await startNewGame();
+
+  }
+
+  Future<void> startNewGame() async {
+
     setState(() {
       _startSpielbrett();
     });
@@ -1401,6 +1395,8 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
   }
+
+
 
   @override
   Widget build(BuildContext context) {
