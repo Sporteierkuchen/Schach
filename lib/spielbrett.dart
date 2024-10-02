@@ -370,45 +370,36 @@ class _SpielBrettState extends State<SpielBrett> {
 
     enemyMove ??= true;
 
-    if(enemyMove){
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) {
 
-      for(int i = 0; i < 8; i++){
-        for(int j = 0; j < 8; j++){
-
-          if(brett[i][j] == null || !brett[i][j]!.isEnemy){
-            continue;
-          }
-
-          List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j],true);
-
-          if(pieceValidMoves.isNotEmpty){
-            allPosibleEnemyMoves.add(FigurenMoves(row: i, col: j, figur: brett[i][j]!, pieceValidMoves: pieceValidMoves));
-          }
-
+        if (brett[i][j] == null) {
+          continue;
         }
-      }
 
-    }
-    else{
-
-      for(int i = 0; i < 8; i++){
-        for(int j = 0; j < 8; j++){
-
-          if(brett[i][j] == null || brett[i][j]!.isEnemy){
-            continue;
-          }
-
-          List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j],true);
-
-          if(pieceValidMoves.isNotEmpty){
-            allPosibleEnemyMoves.add(FigurenMoves(row: i, col: j, figur: brett[i][j]!, pieceValidMoves: pieceValidMoves));
-          }
-
+        if (enemyMove && !brett[i][j]!.isEnemy) {
+          continue;
         }
-      }
+        if (!enemyMove && brett[i][j]!.isEnemy) {
+          continue;
+        }
 
+        List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, brett[i][j], true);
+
+        // Füge die Züge hinzu, wenn welche verfügbar sind
+        if (pieceValidMoves.isNotEmpty) {
+          allPosibleEnemyMoves.add(FigurenMoves(
+              row: i,
+              col: j,
+              figur: brett[i][j]!,
+              pieceValidMoves: pieceValidMoves
+          ));
+        }
+
+      }
     }
 
+    
     Random zufall = Random();
     FigurenMoves figurenMoves= allPosibleEnemyMoves[zufall.nextInt(allPosibleEnemyMoves.length)];
     List<int> randomMove= figurenMoves.pieceValidMoves[zufall.nextInt(figurenMoves.pieceValidMoves.length)];
