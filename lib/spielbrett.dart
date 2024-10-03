@@ -198,16 +198,37 @@ class _SpielBrettState extends State<SpielBrett> {
     //       isEnemy: true);
     // }
 
-
+    //   neuesBrett[2][0] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: true,
+    //       isEnemy: true);
     // neuesBrett[0][0] = Schachfigur(
-    //     art: Schachfigurenart.TURM,
-    //     istWeiss: false,
+    //     art: Schachfigurenart.SPRINGER,
+    //     istWeiss: true,
     //     isEnemy: true,
     // hasMoved: false);
+    //
+    //
+    // neuesBrett[1][2] = Schachfigur(
+    //     art: Schachfigurenart.BAUER,
+    //     istWeiss: true,
+    //     isEnemy: true);
+    // neuesBrett[1][3] = Schachfigur(
+    //     art: Schachfigurenart.BAUER,
+    //     istWeiss: true,
+    //     isEnemy: true);
+    // neuesBrett[1][4] = Schachfigur(
+    //     art: Schachfigurenart.BAUER,
+    //     istWeiss: true,
+    //     isEnemy: true);
 
 
-
-
+    // neuesBrett[3][3] = Schachfigur(
+    //     art: Schachfigurenart.BAUER,
+    //     istWeiss: false,
+    //     isEnemy: false);
+    //
+    //
     //
     // if (figurenfarbe) {
     //
@@ -222,13 +243,13 @@ class _SpielBrettState extends State<SpielBrett> {
     // } else {
     //
     //
-    //   neuesBrett[0][0] = Schachfigur(
+    //   neuesBrett[0][3] = Schachfigur(
     //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: true,hasMoved: false);
-    //   neuesBrett[3][0] = Schachfigur(
+    //   neuesBrett[5][2] = Schachfigur(
     //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: false,hasMoved: false);
     //
-    //   whiteKingPosition = [0,0];
-    //   blackKingPosition = [3,0];
+    //   whiteKingPosition = [0,3];
+    //   blackKingPosition = [5,2];
     //
     // }
 
@@ -372,6 +393,7 @@ class _SpielBrettState extends State<SpielBrett> {
    // Random zufall = Random();
     // FigurenMoves figurenMoves= allPosibleEnemyMoves[zufall.nextInt(allPosibleEnemyMoves.length)];
     // List<int> selectedMove= figurenMoves.pieceValidMoves[zufall.nextInt(figurenMoves.pieceValidMoves.length)];
+
 
       List<FigurenMoves> bestMoves= getBestMove(brett,4,enemyMove,whiteKingPosition,blackKingPosition,moveInfos);
       printInfo(bestMoves);
@@ -770,7 +792,7 @@ class _SpielBrettState extends State<SpielBrett> {
     //Spezialfall en passant mit Bauer
     bool enpassantMove= false;
     Schachfigur? lastPawnWhoMoves2Felder;
-    if(figur.art == Schachfigurenart.BAUER && isEnPassantPosible(figur, startRow, startCol,moveInfos)){
+    if(figur.art == Schachfigurenart.BAUER && isEnPassantPosible(figur, startRow, startCol,moveInfos) && moveInfos?.newCol == endCol){
       enpassantMove= true;
       lastPawnWhoMoves2Felder = brett[moveInfos!.newRow][moveInfos.newCol];
       brett[moveInfos.newRow][moveInfos.newCol] = null;
@@ -1085,11 +1107,11 @@ class _SpielBrettState extends State<SpielBrett> {
 
   bool isEnPassantPosible(Schachfigur schachfigur, int row, int col ,MoveInfos? moveInfos) {
 
-    if (!schachfigur.isEnemy && row == 3 && moveInfos?.newRow == 3 && (moveInfos?.newCol == col-1 || moveInfos?.newCol == col+1) && moveInfos?.figur.art == Schachfigurenart.BAUER && moveInfos!.figur.isEnemy) {
+    if (!schachfigur.isEnemy && row == 3 && moveInfos?.newRow == 3 && (moveInfos?.newCol == col-1 || moveInfos?.newCol == col+1) && moveInfos!.oldRow == 1 && moveInfos?.figur.art == Schachfigurenart.BAUER && moveInfos!.figur.isEnemy) {
       return true;
     }
 
-    if (schachfigur.isEnemy && row == 4 && moveInfos?.newRow == 4 && (moveInfos?.newCol == col-1 || moveInfos?.newCol == col+1) && moveInfos?.figur.art == Schachfigurenart.BAUER && !moveInfos!.figur.isEnemy) {
+    if (schachfigur.isEnemy && row == 4 && moveInfos?.newRow == 4 && (moveInfos?.newCol == col-1 || moveInfos?.newCol == col+1) && moveInfos!.oldRow == 6 && moveInfos?.figur.art == Schachfigurenart.BAUER && !moveInfos!.figur.isEnemy) {
       return true;
     }
     return false;
@@ -1442,7 +1464,12 @@ class _SpielBrettState extends State<SpielBrett> {
 
   List<FigurenMoves> getBestMove(List<List<Schachfigur?>> board, int depth, bool isEnemyMove,List<int> whiteKingPosition, List<int> blackKingPosition,MoveInfos? moveInfos) {
 
+    print(whiteKingPosition);
+    print(blackKingPosition);
+
     List<FigurenMoves> allMoves = getAllLegalMoves(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos);
+
+   // printInfo(allMoves);
 
     List<FigurenMoves> bestMoves = [];
 
@@ -1457,8 +1484,8 @@ class _SpielBrettState extends State<SpielBrett> {
         // Simuliere den Zug für diese spezielle Figur und dieses Ziel
         makeMove(boardCopy, move.row, move.col, destination[0], destination[1],move.figur,moveInfos);
 
-        List<int>? wKP=getKingPosition(board,true);
-        List<int>? bKP=getKingPosition(board,false);
+        List<int>? wKP=getKingPosition(boardCopy,true);
+        List<int>? bKP=getKingPosition(boardCopy,false);
         MoveInfos? mi=MoveInfos(oldRow: move.row, newRow: destination[0], oldCol: move.col, newCol: destination[1], figur: move.figur);
 
         // Rufe den Minimax-Algorithmus auf, um das Ergebnis dieses Zuges zu bewerten
@@ -1651,6 +1678,8 @@ class _SpielBrettState extends State<SpielBrett> {
     if(figur.art == Schachfigurenart.BAUER){
 
       if(isEnPassantPosible(figur, startRow, startCol, moveInfos)  && destCol == moveInfos!.newCol){
+
+        print("en passant");
 
         var geschlagenerBauer = board[moveInfos.newRow][moveInfos.newCol];
         board[moveInfos.newRow][moveInfos.newCol] = null;
