@@ -395,7 +395,7 @@ class _SpielBrettState extends State<SpielBrett> {
     // List<int> selectedMove= figurenMoves.pieceValidMoves[zufall.nextInt(figurenMoves.pieceValidMoves.length)];
 
 
-      List<FigurenMoves> bestMoves= getBestMove(brett,4,enemyMove,whiteKingPosition,blackKingPosition,moveInfos);
+      List<FigurenMoves> bestMoves= getBestMove(brett,3,enemyMove,whiteKingPosition,blackKingPosition,moveInfos);
       printInfo(bestMoves);
       Random zufall = Random();
       FigurenMoves figurenMoves= bestMoves[zufall.nextInt(bestMoves.length)];
@@ -1410,42 +1410,220 @@ class _SpielBrettState extends State<SpielBrett> {
 
   }
 
-  int getPieceValue(Schachfigur piece) {
-    // Bewertungsfunktion für Figuren
-    switch (piece.art) {
-      case Schachfigurenart.BAUER:
-        return 10;
-      case Schachfigurenart.SPRINGER:
-        return 30;
-      case Schachfigurenart.LAEUFER:
-        return 30;
-      case Schachfigurenart.TURM:
-        return 50;
-      case Schachfigurenart.DAME:
-        return 90;
-      case Schachfigurenart.KOENIG:
-        return 900;
-      default:
-        return 0;
-    }
-  }
+ // int getPieceValue(Schachfigur piece) {
+ //    // Bewertungsfunktion für Figuren
+ //    switch (piece.art) {
+ //      case Schachfigurenart.BAUER:
+ //        return 10;
+ //      case Schachfigurenart.SPRINGER:
+ //        return 30;
+ //      case Schachfigurenart.LAEUFER:
+ //        return 30;
+ //      case Schachfigurenart.TURM:
+ //        return 50;
+ //      case Schachfigurenart.DAME:
+ //        return 90;
+ //      case Schachfigurenart.KOENIG:
+ //        return 900;
+ //      default:
+ //        return 0;
+ //    }
+ //  }
 
-  int evaluateBoard(List<List<Schachfigur?>> board) {
-    int score = 0;
+  int evaluateBoard(List<List<Schachfigur?>> board, MoveInfos infos) {
+    int totalEvaluation = 0;
 
-    // Durchlaufe das Schachbrett und berechne den Wert der Figuren
-    for (int i = 0; i < 8; i++) {
-      for (int j = 0; j < 8; j++) {
-        Schachfigur? piece = board[i][j];
+    for (int row = 0; row < 8; row++) {
+      for (int col = 0; col < 8; col++) {
+        Schachfigur? piece = board[row][col];
         if (piece != null) {
-          // Addiere den Wert für den Computer (positive Werte), subtrahiere den Wert für den Gegner (negative Werte)
+          // Bewertung basierend auf dem Materialwert
           int pieceValue = getPieceValue(piece);
-          score += piece.isEnemy ? -pieceValue : pieceValue;
+
+          // Zusätzliche Kriterien anwenden
+          pieceValue += getPositionalBonus(piece, row, col,board);
+          //pieceValue += getPieceMobility(piece, board, row, col,infos);
+
+          if (piece.isEnemy) {
+            totalEvaluation -= pieceValue;
+          } else {
+            totalEvaluation += pieceValue;
+          }
         }
       }
     }
-    return score;
+
+    // Bauernstruktur und Königssicherheit bewerten
+  //  totalEvaluation += evaluatePawnStructure(board);
+    totalEvaluation += evaluateKingSafety(board);
+
+    return totalEvaluation;
   }
+
+// 1. Materialwert der Figuren
+  int getPieceValue(Schachfigur piece) {
+    if (piece.art == Schachfigurenart.BAUER) return 1;
+    if (piece.art == Schachfigurenart.LAEUFER || piece.art == Schachfigurenart.SPRINGER) return 3;
+    if (piece.art == Schachfigurenart.TURM) return 5;
+    if (piece.art == Schachfigurenart.DAME) return 9;
+    if (piece.art == Schachfigurenart.KOENIG) return 0; // König hat keinen materiellen "Punktwert", aber seine Sicherheit ist wichtig
+    return 0;
+  }
+
+// 2. Bewertung der Position einer Figur (Zentrumskontrolle, Aktivität)
+  int getPositionalBonus(Schachfigur piece, int row, int col,List<List<Schachfigur?>> board) {
+    if (piece.art == Schachfigurenart.LAEUFER || piece.art == Schachfigurenart.SPRINGER) {
+      // Kontrolle über das Zentrum
+      if (isCentralSquare(row, col)) return 1;
+    }
+    if (piece.art == Schachfigurenart.TURM) {
+      // Bonus für offene Linien
+      if (isOnOpenFile(row, col,board)) return 2;
+    }
+    return 0;
+  }
+
+// 3. Bestimme, ob eine Figur im Zentrum steht
+  bool isCentralSquare(int row, int col) {
+    return (row == 3 || row == 4) && (col == 3 || col == 4);
+  }
+//
+// // 4. Bewertung der Figurenmobilität (Anzahl legaler Züge)
+//   int getPieceMobility(Schachfigur piece, List<List<Schachfigur?>> board, int row, int col, MoveInfos infos) {
+//
+//     List<int>? wKP=getKingPosition(board, true);
+//     List<int>? bKP=getKingPosition(board, false);
+//
+//     List<List<int>> validMoves = calculateRealValidMoves(row, col, piece, true,board,wKP!,bKP!,infos);
+//     return validMoves.length;
+//   }
+//
+// // 5. Bewertung der Bauernstruktur
+//   int evaluatePawnStructure(List<List<Schachfigur?>> board) {
+//     int evaluation = 0;
+//     for (int row = 0; row < 8; row++) {
+//       for (int col = 0; col < 8; col++) {
+//         Schachfigur? piece = board[row][col];
+//         if (piece?.art == Schachfigurenart.BAUER) {
+//           // Abzüge für isolierte oder doppelte Bauern
+//           if (isIsolatedPawn(board, row, col)) evaluation -= 1;
+//           if (isDoubledPawn(board, row, col)) evaluation -= 1;
+//           // Bonus für Freibauern
+//           if (isPassedPawn(board, row, col)) evaluation += 2;
+//         }
+//       }
+//     }
+//     return evaluation;
+//   }
+//
+// // 6. Überprüfe, ob ein Bauer isoliert ist
+//   bool isIsolatedPawn(List<List<Schachfigur?>> board, int row, int col) {
+//     if (col > 0 && board[row][col - 1]?.art == Schachfigurenart.BAUER) return false;
+//     if (col < 7 && board[row][col + 1]?.art == Schachfigurenart.BAUER) return false;
+//     return true;  // Der Bauer ist isoliert
+//   }
+//
+// // 7. Überprüfe, ob zwei Bauern auf derselben Linie stehen (Doppelte Bauern)
+//   bool isDoubledPawn(List<List<Schachfigur?>> board, int row, int col) {
+//     for (int i = 0; i < 8; i++) {
+//       if (i != row && board[i][col]?.art == Schachfigurenart.BAUER) {
+//         return true; // Es gibt einen anderen Bauern auf derselben Spalte
+//       }
+//     }
+//     return false;
+//   }
+//
+// // 8. Überprüfe, ob ein Bauer ein Freibauer ist
+//   bool isPassedPawn(List<List<Schachfigur?>> board, int row, int col) {
+//     Schachfigur? piece = board[row][col];
+//     if (piece?.art != Schachfigurenart.BAUER) return false;
+//
+//     bool enemyInFront = false;
+//
+//     // Überprüfe gegnerische Bauern in den gleichen und benachbarten Spalten
+//     for (int r = 0; r < 8; r++) {
+//       if (r == row) continue; // Überspringe die eigene Reihe
+//       if (piece!.isEnemy) {
+//         // Für schwarze Bauern (feindliche)
+//         if (r < row && (board[r][col]?.art == Schachfigurenart.BAUER || (col > 0 && board[r][col - 1]?.art == Schachfigurenart.BAUER) || (col < 7 && board[r][col + 1]?.art == Schachfigurenart.BAUER))) {
+//           enemyInFront = true;
+//         }
+//       } else {
+//         // Für weiße Bauern
+//         if (r > row && (board[r][col]?.art == Schachfigurenart.BAUER || (col > 0 && board[r][col - 1]?.art == Schachfigurenart.BAUER) || (col < 7 && board[r][col + 1]?.art == Schachfigurenart.BAUER))) {
+//           enemyInFront = true;
+//         }
+//       }
+//     }
+//
+//     return !enemyInFront;
+//   }
+
+// 9. Bewertung der Königssicherheit
+  int evaluateKingSafety(List<List<Schachfigur?>> board) {
+    int evaluation = 0;
+    Schachfigur? whiteKing;
+    Schachfigur? blackKing;
+    List<int>? whiteKingPos;
+    List<int>? blackKingPos;
+
+    // Finde die Position des Königs
+    for (int row = 0; row < 8; row++) {
+      for (int col = 0; col < 8; col++) {
+        if (board[row][col]?.art == Schachfigurenart.KOENIG) {
+          if (board[row][col]!.isEnemy) {
+            blackKing = board[row][col];
+            blackKingPos = [row, col];
+          } else {
+            whiteKing = board[row][col];
+            whiteKingPos = [row, col];
+          }
+        }
+      }
+    }
+
+    // Sichere den weißen König
+    if (whiteKing != null && whiteKingPos != null) {
+      evaluation += checkKingSafety(board, whiteKingPos[0], whiteKingPos[1], false);
+    }
+
+    // Sichere den schwarzen König
+    if (blackKing != null && blackKingPos != null) {
+      evaluation -= checkKingSafety(board, blackKingPos[0], blackKingPos[1], true);
+    }
+
+    return evaluation;
+  }
+
+// Zusätzliche Logik zur Überprüfung der Königssicherheit
+  int checkKingSafety(List<List<Schachfigur?>> board, int row, int col, bool isEnemyKing) {
+    int safetyScore = 0;
+
+    // Überprüfe, ob der König von Bauern geschützt ist
+    if (row > 0 && board[row - 1][col]?.art == Schachfigurenart.BAUER && board[row - 1][col]!.isEnemy == isEnemyKing) {
+      safetyScore += 1; // König wird durch Bauern auf der vorderen Linie geschützt
+    }
+
+    if (row < 7 && board[row + 1][col]?.art == Schachfigurenart.BAUER && board[row + 1][col]!.isEnemy == isEnemyKing) {
+      safetyScore += 1; // König wird durch Bauern auf der hinteren Linie geschützt
+    }
+
+    // Du kannst diese Logik noch weiter verfeinern, um seitlichen Schutz und Rochaden-Sicherheit zu bewerten.
+
+    return safetyScore;
+  }
+
+// 10. Überprüfe, ob ein Turm auf einer offenen Linie steht
+  bool isOnOpenFile(int row, int col,List<List<Schachfigur?>> board) {
+    // Beispielhafte Logik für offene Linien (ohne eigene Bauern)
+    for (int r = 0; r < 8; r++) {
+      if (r != row && (board[r][col]?.art == Schachfigurenart.BAUER)) {
+        return false; // Es gibt einen Bauern auf dieser Linie
+      }
+    }
+    return true;
+  }
+
 
   List<List<Schachfigur?>> cloneBoard(List<List<Schachfigur?>> board) {
     List<List<Schachfigur?>> newBoard = List.generate(8, (i) => List.generate(8, (j) =>  null ));
@@ -1525,13 +1703,13 @@ class _SpielBrettState extends State<SpielBrett> {
   int minimax(List<List<Schachfigur?>> board, int depth, bool isEnemyMove, int alpha, int beta,List<int> whiteKingPosition, List<int> blackKingPosition,MoveInfos? moveInfos){
 
     if (depth == 0) {
-      return evaluateBoard(board);
+      return evaluateBoard(board,moveInfos!);
     }
 
     List<FigurenMoves> allMoves = getAllLegalMoves(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos);
 
     if (allMoves.isEmpty) {
-      return evaluateBoard(board);  // Falls keine Züge möglich sind, bewerte das Brett.
+      return evaluateBoard(board,moveInfos!);  // Falls keine Züge möglich sind, bewerte das Brett.
     }
 
     if (isEnemyMove) {
@@ -1678,8 +1856,6 @@ class _SpielBrettState extends State<SpielBrett> {
     if(figur.art == Schachfigurenart.BAUER){
 
       if(isEnPassantPosible(figur, startRow, startCol, moveInfos)  && destCol == moveInfos!.newCol){
-
-        print("en passant");
 
         var geschlagenerBauer = board[moveInfos.newRow][moveInfos.newCol];
         board[moveInfos.newRow][moveInfos.newCol] = null;
