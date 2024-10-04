@@ -14,9 +14,9 @@ import 'components/Enums.dart';
 
 class SpielBrett extends StatefulWidget {
 
-  bool figurenfarbe;
-  int spielModus;
-  SpielBrett({super.key, required this.figurenfarbe, required this.spielModus});
+ final bool figurenfarbe;
+ final int spielModus;
+  const SpielBrett({super.key, required this.figurenfarbe, required this.spielModus});
 
   @override
   State<SpielBrett> createState() => _SpielBrettState();
@@ -1736,8 +1736,6 @@ class _SpielBrettState extends State<SpielBrett> {
     if(figur.art == Schachfigurenart.BAUER){
 
       if(isEnPassantPosible(figur, startRow, startCol, moveInfos)  && destCol == moveInfos!.newCol){
-
-        var geschlagenerBauer = board[moveInfos.newRow][moveInfos.newCol];
         board[moveInfos.newRow][moveInfos.newCol] = null;
       }
 
