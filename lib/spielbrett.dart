@@ -394,7 +394,6 @@ class _SpielBrettState extends State<SpielBrett> {
     // FigurenMoves figurenMoves= allPosibleEnemyMoves[zufall.nextInt(allPosibleEnemyMoves.length)];
     // List<int> selectedMove= figurenMoves.pieceValidMoves[zufall.nextInt(figurenMoves.pieceValidMoves.length)];
 
-
       List<FigurenMoves> bestMoves= getBestMove(brett,3,enemyMove,whiteKingPosition,blackKingPosition,moveInfos);
       printInfo(bestMoves);
       Random zufall = Random();
@@ -421,24 +420,6 @@ class _SpielBrettState extends State<SpielBrett> {
     if(figurenMoves.figur.art == Schachfigurenart.BAUER){
 
       checkBauerMove(figurenMoves.figur, figurenMoves.row, figurenMoves.col, selectedMove[0], selectedMove[1]);
-
-      if((selectedMove[0] == 7 && figurenMoves.figur.isEnemy) || (selectedMove[0] == 0 && !figurenMoves.figur.isEnemy)){
-
-        Schachfigur? neueFigur;
-
-        List<Schachfigur> figurenListe = <Schachfigur>[
-          Schachfigur(art: Schachfigurenart.DAME, istWeiss: figurenMoves.figur.istWeiss, isEnemy: figurenMoves.figur.isEnemy),
-          Schachfigur(art: Schachfigurenart.TURM, istWeiss: figurenMoves.figur.istWeiss, isEnemy: figurenMoves.figur.isEnemy, hasMoved: true),
-          Schachfigur(art: Schachfigurenart.SPRINGER, istWeiss: figurenMoves.figur.istWeiss, isEnemy: figurenMoves.figur.isEnemy),
-          Schachfigur(art: Schachfigurenart.LAEUFER, istWeiss: figurenMoves.figur.istWeiss, isEnemy: figurenMoves.figur.isEnemy),
-        ];
-
-        Random zufall = Random();
-        neueFigur= figurenListe[zufall.nextInt(figurenListe.length)];
-
-        figurenMoves.figur = neueFigur;
-
-      }
 
     }
 
@@ -1444,41 +1425,97 @@ class _SpielBrettState extends State<SpielBrett> {
         // Erstelle eine Kopie des aktuellen Bretts
         List<List<Schachfigur?>> boardCopy = cloneBoard(board);
 
-        // Simuliere den Zug für diese spezielle Figur und dieses Ziel
-        makeMove(boardCopy, move.row, move.col, destination[0], destination[1],move.figur,moveInfos);
+        if(move.figur.art == Schachfigurenart.BAUER && (destination[0] == 0 || destination[0] == 7)){
 
-        List<int>? wKP=getKingPosition(boardCopy,true);
-        List<int>? bKP=getKingPosition(boardCopy,false);
-        MoveInfos? mi=MoveInfos(oldRow: move.row, newRow: destination[0], oldCol: move.col, newCol: destination[1], figur: move.figur);
+          // Bauer erreicht letzte Reihe -> mehrere Promotion-Optionen testen
+          List<Schachfigur> promotionOptions = [
+                Schachfigur(art: Schachfigurenart.DAME, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+                Schachfigur(art: Schachfigurenart.TURM, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy, hasMoved: true),
+                Schachfigur(art: Schachfigurenart.SPRINGER, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+                Schachfigur(art: Schachfigurenart.LAEUFER, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+          ];
 
-        // Rufe den Minimax-Algorithmus auf, um das Ergebnis dieses Zuges zu bewerten
-        int boardValue = minimax(boardCopy, depth - 1, !isEnemyMove, -10000, 10000,wKP!,bKP!,mi);
+          for (Schachfigur promotion in promotionOptions) {
+            List<List<Schachfigur?>> boardCopyForPromotion = cloneBoard(boardCopy);
+            boardCopyForPromotion[destination[0]][destination[1]] = promotion;
+            boardCopyForPromotion[move.row][move.col] = null;
 
-        if (isEnemyMove) {
 
-          if(boardValue == bestValue){
-            bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: move.figur, pieceValidMoves: [destination]));
+            // Minimax-Algorithmus aufrufen
+            int boardValue = minimax(boardCopyForPromotion, depth - 1, !isEnemyMove, -10000, 10000,whiteKingPosition,blackKingPosition,moveInfos);
+
+
+            if (isEnemyMove) {
+
+              if(boardValue == bestValue){
+                bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: promotion, pieceValidMoves: [destination]));
+              }
+              if (boardValue < bestValue) {
+
+                bestMoves.clear();
+                bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: promotion, pieceValidMoves: [destination]));
+                bestValue = boardValue;
+
+              }
+            } else {
+
+              if(boardValue == bestValue){
+                bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: promotion, pieceValidMoves: [destination]));
+              }
+              if (boardValue > bestValue) {
+
+                bestMoves.clear();
+                bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: promotion, pieceValidMoves: [destination]));
+                bestValue = boardValue;
+
+              }
+            }
+
+
           }
-          if (boardValue < bestValue) {
 
-            bestMoves.clear();
-            bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: move.figur, pieceValidMoves: [destination]));
-            bestValue = boardValue;
-
-          }
-        } else {
-
-          if(boardValue == bestValue){
-            bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: move.figur, pieceValidMoves: [destination]));
-          }
-          if (boardValue > bestValue) {
-
-            bestMoves.clear();
-            bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: move.figur, pieceValidMoves: [destination]));
-            bestValue = boardValue;
-
-          }
         }
+        else{
+
+          // Simuliere den Zug für diese spezielle Figur und dieses Ziel
+          makeMove(boardCopy, move.row, move.col, destination[0], destination[1],move.figur,moveInfos);
+
+          List<int>? wKP=getKingPosition(boardCopy,true);
+          List<int>? bKP=getKingPosition(boardCopy,false);
+          MoveInfos? mi=MoveInfos(oldRow: move.row, newRow: destination[0], oldCol: move.col, newCol: destination[1], figur: move.figur);
+
+          // Rufe den Minimax-Algorithmus auf, um das Ergebnis dieses Zuges zu bewerten
+          int boardValue = minimax(boardCopy, depth - 1, !isEnemyMove, -10000, 10000,wKP!,bKP!,mi);
+
+          if (isEnemyMove) {
+
+            if(boardValue == bestValue){
+              bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: move.figur, pieceValidMoves: [destination]));
+            }
+            if (boardValue < bestValue) {
+
+              bestMoves.clear();
+              bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: move.figur, pieceValidMoves: [destination]));
+              bestValue = boardValue;
+
+            }
+          } else {
+
+            if(boardValue == bestValue){
+              bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: move.figur, pieceValidMoves: [destination]));
+            }
+            if (boardValue > bestValue) {
+
+              bestMoves.clear();
+              bestMoves.add(FigurenMoves(row: move.row, col: move.col, figur: move.figur, pieceValidMoves: [destination]));
+              bestValue = boardValue;
+
+            }
+          }
+
+        }
+
+
       }
     }
 
@@ -1504,18 +1541,53 @@ class _SpielBrettState extends State<SpielBrett> {
 
           List<List<Schachfigur?>> boardCopy = cloneBoard(board);
 
-          makeMove(boardCopy, move.row, move.col, destination[0], destination[1],move.figur,moveInfos);
+          if(move.figur.art == Schachfigurenart.BAUER && (destination[0] == 0 || destination[0] == 7)){
 
-          List<int>? wKP=getKingPosition(boardCopy,true);
-          List<int>? bKP=getKingPosition(boardCopy,false);
-          MoveInfos? mi=MoveInfos(oldRow: move.row, newRow: destination[0], oldCol: move.col, newCol: destination[1], figur: move.figur);
+            // Bauer erreicht letzte Reihe -> mehrere Promotion-Optionen testen
+            List<Schachfigur> promotionOptions = [
+              Schachfigur(art: Schachfigurenart.DAME, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+              Schachfigur(art: Schachfigurenart.TURM, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy, hasMoved: true),
+              Schachfigur(art: Schachfigurenart.SPRINGER, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+              Schachfigur(art: Schachfigurenart.LAEUFER, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+            ];
 
-          int eval = minimax(boardCopy, depth - 1, false, alpha, beta,wKP!,bKP!, mi);
-          minEval = min(minEval, eval);
-          beta = min(beta, eval);
-          if (beta <= alpha) {
-            break;  // Alpha-Beta-Pruning
+            for (Schachfigur promotion in promotionOptions) {
+              List<List<Schachfigur?>> boardCopyForPromotion = cloneBoard(boardCopy);
+              boardCopyForPromotion[destination[0]][destination[1]] = promotion;
+              boardCopyForPromotion[move.row][move.col] = null;
+
+
+              // Minimax-Algorithmus aufrufen
+              int eval = minimax(boardCopyForPromotion, depth - 1, false, alpha, beta,whiteKingPosition,blackKingPosition, moveInfos);
+              minEval = min(minEval, eval);
+              beta = min(beta, eval);
+              if (beta <= alpha) {
+                break;  // Alpha-Beta-Pruning
+              }
+
+            }
+
+
+
           }
+          else{
+
+            makeMove(boardCopy, move.row, move.col, destination[0], destination[1],move.figur,moveInfos);
+
+            List<int>? wKP=getKingPosition(boardCopy,true);
+            List<int>? bKP=getKingPosition(boardCopy,false);
+            MoveInfos? mi=MoveInfos(oldRow: move.row, newRow: destination[0], oldCol: move.col, newCol: destination[1], figur: move.figur);
+
+            int eval = minimax(boardCopy, depth - 1, false, alpha, beta,wKP!,bKP!, mi);
+            minEval = min(minEval, eval);
+            beta = min(beta, eval);
+            if (beta <= alpha) {
+              break;  // Alpha-Beta-Pruning
+            }
+
+          }
+
+
         }
       }
       return minEval;
@@ -1526,19 +1598,49 @@ class _SpielBrettState extends State<SpielBrett> {
 
           List<List<Schachfigur?>> boardCopy = cloneBoard(board);
 
-          makeMove(boardCopy, move.row, move.col, destination[0], destination[1],move.figur,moveInfos);
+          if(move.figur.art == Schachfigurenart.BAUER && (destination[0] == 0 || destination[0] == 7)){
 
-          List<int>? wKP=getKingPosition(boardCopy,true);
-          List<int>? bKP=getKingPosition(boardCopy,false);
-          MoveInfos? mi=MoveInfos(oldRow: move.row, newRow: destination[0], oldCol: move.col, newCol: destination[1], figur: move.figur);
+            // Bauer erreicht letzte Reihe -> mehrere Promotion-Optionen testen
+            List<Schachfigur> promotionOptions = [
+              Schachfigur(art: Schachfigurenart.DAME, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+              Schachfigur(art: Schachfigurenart.TURM, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy, hasMoved: true),
+              Schachfigur(art: Schachfigurenart.SPRINGER, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+              Schachfigur(art: Schachfigurenart.LAEUFER, istWeiss: move.figur.istWeiss , isEnemy: move.figur.isEnemy),
+            ];
 
+            for (Schachfigur promotion in promotionOptions) {
+              List<List<Schachfigur?>> boardCopyForPromotion = cloneBoard(boardCopy);
+              boardCopyForPromotion[destination[0]][destination[1]] = promotion;
+              boardCopyForPromotion[move.row][move.col] = null;
 
-          int eval = minimax(boardCopy, depth - 1, true, alpha, beta,wKP!,bKP!,mi);
-          maxEval = max(maxEval, eval);
-          alpha = max(alpha, eval);
-          if (alpha >= beta) {
-            break;  // Alpha-Beta-Pruning
+              int eval = minimax(boardCopy, depth - 1, true, alpha, beta,whiteKingPosition,blackKingPosition,moveInfos);
+              maxEval = max(maxEval, eval);
+              alpha = max(alpha, eval);
+              if (alpha >= beta) {
+                break;  // Alpha-Beta-Pruning
+              }
+
+            }
+
           }
+          else{
+
+            makeMove(boardCopy, move.row, move.col, destination[0], destination[1],move.figur,moveInfos);
+
+            List<int>? wKP=getKingPosition(boardCopy,true);
+            List<int>? bKP=getKingPosition(boardCopy,false);
+            MoveInfos? mi=MoveInfos(oldRow: move.row, newRow: destination[0], oldCol: move.col, newCol: destination[1], figur: move.figur);
+
+
+            int eval = minimax(boardCopy, depth - 1, true, alpha, beta,wKP!,bKP!,mi);
+            maxEval = max(maxEval, eval);
+            alpha = max(alpha, eval);
+            if (alpha >= beta) {
+              break;  // Alpha-Beta-Pruning
+            }
+
+          }
+
         }
       }
       return maxEval;
@@ -1622,14 +1724,6 @@ class _SpielBrettState extends State<SpielBrett> {
         figur.hasMoved= true;
       }
 
-
-      // if(king.istWeiss){
-      //   whiteKingPosition = [newRow,newCol];
-      // }
-      // else{
-      //   blackKingPosition = [newRow,newCol];
-      // }
-
     }
 
     //Wenn Turm bewegt ist Rochade auf seiner Seite nicht mehr möglich
@@ -1645,25 +1739,6 @@ class _SpielBrettState extends State<SpielBrett> {
         var geschlagenerBauer = board[moveInfos.newRow][moveInfos.newCol];
         board[moveInfos.newRow][moveInfos.newCol] = null;
       }
-
-
-      // if((destRow == 7 && figur.isEnemy) || (destRow == 0 && !figur.isEnemy)){
-      //
-      //   Schachfigur? neueFigur;
-      //
-      //   List<Schachfigur> figurenListe = <Schachfigur>[
-      //     Schachfigur(art: Schachfigurenart.DAME, istWeiss: figur.istWeiss, isEnemy: figur.isEnemy),
-      //     Schachfigur(art: Schachfigurenart.TURM, istWeiss: figur.istWeiss, isEnemy: figur.isEnemy, hasMoved: true),
-      //     Schachfigur(art: Schachfigurenart.SPRINGER, istWeiss: figur.istWeiss, isEnemy: figur.isEnemy),
-      //     Schachfigur(art: Schachfigurenart.LAEUFER, istWeiss: figur.istWeiss, isEnemy: figur.isEnemy),
-      //   ];
-      //
-      //   Random zufall = Random();
-      //   neueFigur= figurenListe[zufall.nextInt(figurenListe.length)];
-      //
-      //   figur = neueFigur;
-      //
-      // }
 
     }
 
