@@ -51,6 +51,7 @@ class _SpielBrettState extends State<SpielBrett> {
 
   @override
   void initState() {
+    super.initState();
 
     figurenfarbe = widget.figurenfarbe;
     spielModus = widget.spielModus;
@@ -1088,11 +1089,11 @@ class _SpielBrettState extends State<SpielBrett> {
 
   bool isEnPassantPosible(Schachfigur schachfigur, int row, int col ,MoveInfos? moveInfos) {
 
-    if (!schachfigur.isEnemy && row == 3 && moveInfos?.newRow == 3 && (moveInfos?.newCol == col-1 || moveInfos?.newCol == col+1) && moveInfos!.oldRow == 1 && moveInfos?.figur.art == Schachfigurenart.BAUER && moveInfos!.figur.isEnemy) {
+    if (!schachfigur.isEnemy && row == 3 && moveInfos?.newRow == 3 && (moveInfos?.newCol == col-1 || moveInfos?.newCol == col+1) && moveInfos!.oldRow == 1 && moveInfos.figur.art == Schachfigurenart.BAUER && moveInfos.figur.isEnemy) {
       return true;
     }
 
-    if (schachfigur.isEnemy && row == 4 && moveInfos?.newRow == 4 && (moveInfos?.newCol == col-1 || moveInfos?.newCol == col+1) && moveInfos!.oldRow == 6 && moveInfos?.figur.art == Schachfigurenart.BAUER && !moveInfos!.figur.isEnemy) {
+    if (schachfigur.isEnemy && row == 4 && moveInfos?.newRow == 4 && (moveInfos?.newCol == col-1 || moveInfos?.newCol == col+1) && moveInfos!.oldRow == 6 && moveInfos.figur.art == Schachfigurenart.BAUER && !moveInfos.figur.isEnemy) {
       return true;
     }
     return false;
