@@ -176,8 +176,8 @@ class _SpielBrettState extends State<SpielBrett> {
     //     art: Schachfigurenart.BAUER,
     //     istWeiss: false,
     //     isEnemy: true);
-
-
+    //
+    //
     //
     // for (int i = 6; i < 8; i++) {
     //   neuesBrett[1][i] = Schachfigur(
@@ -203,28 +203,33 @@ class _SpielBrettState extends State<SpielBrett> {
     //       art: Schachfigurenart.BAUER,
     //       istWeiss: true,
     //       isEnemy: true);
-    // neuesBrett[0][0] = Schachfigur(
-    //     art: Schachfigurenart.SPRINGER,
+    // neuesBrett[3][1] = Schachfigur(
+    //     art: Schachfigurenart.BAUER,
     //     istWeiss: true,
     //     isEnemy: true,
     // hasMoved: false);
     //
     //
-    // neuesBrett[1][2] = Schachfigur(
+    // neuesBrett[3][0] = Schachfigur(
     //     art: Schachfigurenart.BAUER,
+    //     istWeiss: false,
+    //     isEnemy: false);
+    //
+    //
+    //
+    //
+    // neuesBrett[5][2] = Schachfigur(
+    //     art: Schachfigurenart.DAME,
     //     istWeiss: true,
     //     isEnemy: true);
-    // neuesBrett[1][3] = Schachfigur(
-    //     art: Schachfigurenart.BAUER,
+    //
+    // neuesBrett[0][6] = Schachfigur(
+    //     art: Schachfigurenart.DAME,
     //     istWeiss: true,
     //     isEnemy: true);
-    // neuesBrett[1][4] = Schachfigur(
-    //     art: Schachfigurenart.BAUER,
-    //     istWeiss: true,
-    //     isEnemy: true);
-
-
-    // neuesBrett[3][3] = Schachfigur(
+    //
+    //
+    // neuesBrett[2][4] = Schachfigur(
     //     art: Schachfigurenart.BAUER,
     //     istWeiss: false,
     //     isEnemy: false);
@@ -244,13 +249,13 @@ class _SpielBrettState extends State<SpielBrett> {
     // } else {
     //
     //
-    //   neuesBrett[0][3] = Schachfigur(
+    //   neuesBrett[1][1] = Schachfigur(
     //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: true,hasMoved: false);
-    //   neuesBrett[5][2] = Schachfigur(
+    //   neuesBrett[3][5] = Schachfigur(
     //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: false,hasMoved: false);
     //
-    //   whiteKingPosition = [0,3];
-    //   blackKingPosition = [5,2];
+    //   whiteKingPosition = [1,1];
+    //   blackKingPosition = [3,5];
     //
     // }
 
@@ -1614,7 +1619,7 @@ class _SpielBrettState extends State<SpielBrett> {
               boardCopyForPromotion[destination[0]][destination[1]] = promotion;
               boardCopyForPromotion[move.row][move.col] = null;
 
-              int eval = minimax(boardCopy, depth - 1, true, alpha, beta,whiteKingPosition,blackKingPosition,moveInfos);
+              int eval = minimax(boardCopyForPromotion, depth - 1, true, alpha, beta,whiteKingPosition,blackKingPosition,moveInfos);
               maxEval = max(maxEval, eval);
               alpha = max(alpha, eval);
               if (alpha >= beta) {
