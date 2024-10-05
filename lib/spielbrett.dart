@@ -167,95 +167,97 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
 
-    //   neuesBrett[1][2] = Schachfigur(
-    //       art: Schachfigurenart.DAME,
-    //       istWeiss: true,
-    //       isEnemy: false);
+
+
+
+    // if (figurenfarbe) {
     //
-    // neuesBrett[4][1] = Schachfigur(
-    //     art: Schachfigurenart.BAUER,
-    //     istWeiss: false,
-    //     isEnemy: true);
+    //   neuesBrett[4][0] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: true,hasMoved: false);
+    //   neuesBrett[6][1] = Schachfigur(
+    //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: false,hasMoved: false);
+    //
+    //   whiteKingPosition = [6,1];
+    //   blackKingPosition = [4,0];
     //
     //
-    //
-    // for (int i = 6; i < 8; i++) {
-    //   neuesBrett[1][i] = Schachfigur(
-    //       art: Schachfigurenart.BAUER,
-    //       istWeiss: true,
-    //       isEnemy: false);
-    // }
-    // for (int i = 0; i < 6; i++) {
-    //   neuesBrett[2][i] = Schachfigur(
-    //       art: Schachfigurenart.BAUER,
-    //       istWeiss: true,
-    //       isEnemy: false);
-    // }
-    //
-    // for (int i = 0; i < 6; i++) {
-    //   neuesBrett[6][i] = Schachfigur(
+    //   neuesBrett[3][0] = Schachfigur(
     //       art: Schachfigurenart.BAUER,
     //       istWeiss: false,
     //       isEnemy: true);
-    // }
-
-    //   neuesBrett[2][0] = Schachfigur(
+    //   neuesBrett[3][1] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: true,
+    //       hasMoved: false);
+    //   neuesBrett[4][1] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: true,
+    //       hasMoved: false);
+    //   neuesBrett[5][1] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: true,
+    //       hasMoved: false);
+    //
+    //   neuesBrett[5][4] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: true,
+    //       hasMoved: false);
+    //
+    //
+    //
+    //   neuesBrett[1][5] = Schachfigur(
     //       art: Schachfigurenart.BAUER,
     //       istWeiss: true,
-    //       isEnemy: true);
-    // neuesBrett[3][1] = Schachfigur(
-    //     art: Schachfigurenart.BAUER,
-    //     istWeiss: true,
-    //     isEnemy: true,
-    // hasMoved: false);
+    //       isEnemy: false);
     //
-    //
-    // neuesBrett[3][0] = Schachfigur(
-    //     art: Schachfigurenart.BAUER,
-    //     istWeiss: false,
-    //     isEnemy: false);
-    //
-    //
-    //
-    //
-    // neuesBrett[5][2] = Schachfigur(
-    //     art: Schachfigurenart.DAME,
-    //     istWeiss: true,
-    //     isEnemy: true);
-    //
-    // neuesBrett[0][6] = Schachfigur(
-    //     art: Schachfigurenart.DAME,
-    //     istWeiss: true,
-    //     isEnemy: true);
-    //
-    //
-    // neuesBrett[2][4] = Schachfigur(
-    //     art: Schachfigurenart.BAUER,
-    //     istWeiss: false,
-    //     isEnemy: false);
-    //
-    //
-    //
-    // if (figurenfarbe) {
-    //
-    //   neuesBrett[4][2] = Schachfigur(
-    //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: true,hasMoved: false);
-    //   neuesBrett[6][7] = Schachfigur(
-    //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: false,hasMoved: false);
-    //
-    //   whiteKingPosition = [6,7];
-    //   blackKingPosition = [4,2];
     //
     // } else {
     //
     //
-    //   neuesBrett[1][1] = Schachfigur(
+    //   neuesBrett[1][6] = Schachfigur(
     //       art: Schachfigurenart.KOENIG, istWeiss: true, isEnemy: true,hasMoved: false);
-    //   neuesBrett[3][5] = Schachfigur(
+    //   neuesBrett[3][7] = Schachfigur(
     //       art: Schachfigurenart.KOENIG, istWeiss: false, isEnemy: false,hasMoved: false);
     //
-    //   whiteKingPosition = [1,1];
-    //   blackKingPosition = [3,5];
+    //   whiteKingPosition = [1,6];
+    //   blackKingPosition = [3,7];
+    //
+    //
+    //   neuesBrett[4][7] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: false);
+    //   neuesBrett[4][6] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: false);
+    //   neuesBrett[3][6] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: false);
+    //   neuesBrett[2][6] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: false);
+    //
+    //
+    //   neuesBrett[2][3] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: false,
+    //       isEnemy: false,
+    //       hasMoved: false);
+    //
+    //
+    //
+    //   neuesBrett[6][2] = Schachfigur(
+    //       art: Schachfigurenart.BAUER,
+    //       istWeiss: true,
+    //       isEnemy: true);
+    //
     //
     // }
 
@@ -1530,15 +1532,15 @@ class _SpielBrettState extends State<SpielBrett> {
 
   int minimax(List<List<Schachfigur?>> board, int depth, bool isEnemyMove, int alpha, int beta,List<int> whiteKingPosition, List<int> blackKingPosition,MoveInfos? moveInfos){
 
-    if (depth == 0) {
-      return evaluateBoard(board,moveInfos!);
+    // Prüfe, ob das Spiel vorbei ist oder die maximale Tiefe erreicht wurde
+    int? gameStateEvaluation = isGameOver(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos);
+    if (depth == 0 || gameStateEvaluation != null) {
+      // Wenn das Spiel vorbei ist, gibt isGameOver eine Bewertung zurück (9999, -9999 oder 0)
+      // oder wir verwenden die Evaluationsfunktion bei der maximalen Tiefe
+      return gameStateEvaluation ?? evaluateBoard(board);
     }
 
-    List<FigurenMoves> allMoves = getAllLegalMoves(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos);
-
-    if (allMoves.isEmpty) {
-      return evaluateBoard(board,moveInfos!);  // Falls keine Züge möglich sind, bewerte das Brett.
-    }
+     List<FigurenMoves> allMoves = getAllLegalMoves(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos);
 
     if (isEnemyMove) {
       int minEval = 9999;
@@ -1792,6 +1794,86 @@ class _SpielBrettState extends State<SpielBrett> {
     print('  a b c d e f g h');
   }
 
+
+  List<int> findKingPosition2(List<List<Schachfigur?>> board, bool isEnemyMove) {
+    for (int row = 0; row < 8; row++) {
+      for (int col = 0; col < 8; col++) {
+        Schachfigur? piece = board[row][col];
+        if (piece != null && piece.art == Schachfigurenart.KOENIG && piece.isEnemy == isEnemyMove) {
+          return [row, col];  // Position des Königs gefunden
+        }
+      }
+    }
+    throw Exception('König nicht gefunden!');  // Falls kein König gefunden wird (sollte nicht passieren)
+  }
+
+  bool isKingInCheck2(List<List<Schachfigur?>> board, bool isEnemyMove,List<int> whiteKingPosition, List<int> blackKingPosition,MoveInfos? moveInfos) {
+    // Finde die Position des Königs des aktuellen Spielers
+    List<int> kingPosition = findKingPosition2(board, isEnemyMove);
+
+    // Überprüfe, ob eine gegnerische Figur den König bedroht
+    for (int row = 0; row < 8; row++) {
+      for (int col = 0; col < 8; col++) {
+        Schachfigur? piece = board[row][col];
+
+        // Prüfe alle gegnerischen Figuren
+        if (piece != null && piece.isEnemy != isEnemyMove) {
+          List<List<int>> validMoves = calculateRealValidMoves(row, col, piece, false,board,whiteKingPosition,blackKingPosition,moveInfos);
+          for (List<int> move in validMoves) {
+            if (move[0] == kingPosition[0] && move[1] == kingPosition[1]) {
+              return true;  // Der König wird bedroht (Schach)
+            }
+          }
+        }
+      }
+    }
+    return false;  // Der König ist nicht im Schach
+  }
+
+  bool isCheckmate2(List<List<Schachfigur?>> board, bool isEnemyMove,List<int> whiteKingPosition, List<int> blackKingPosition,MoveInfos? moveInfos) {
+    // Prüfe, ob der König des aktuellen Spielers im Schach steht
+    if (isKingInCheck2(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos)) {
+      // Finde alle legalen Züge des Spielers
+      List<FigurenMoves> allLegalMoves = getAllLegalMoves(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos);
+
+      // Wenn keine legalen Züge vorhanden sind, ist es Schachmatt
+      if (allLegalMoves.isEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool isStalemate2(List<List<Schachfigur?>> board, bool isEnemyMove,List<int> whiteKingPosition, List<int> blackKingPosition,MoveInfos? moveInfos) {
+    // Prüfe, ob der König des aktuellen Spielers NICHT im Schach steht
+    if (!isKingInCheck2(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos)) {
+      // Finde alle legalen Züge des Spielers
+      List<FigurenMoves> allLegalMoves = getAllLegalMoves(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos);
+
+      // Wenn keine legalen Züge vorhanden sind, ist es Patt
+      if (allLegalMoves.isEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  int? isGameOver(List<List<Schachfigur?>> board, bool isEnemyMove,List<int> whiteKingPosition, List<int> blackKingPosition,MoveInfos? moveInfos) {
+
+    // Prüfe, ob der König im Schach steht und keine legalen Züge existieren
+    if (isCheckmate2(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos)) {
+      return isEnemyMove ? 9999 : -9999;  // Schachmatt für den Gegner ist ein Gewinn
+    }
+
+    // Prüfe auf Patt
+    if (isStalemate2(board, isEnemyMove,whiteKingPosition,blackKingPosition,moveInfos)) {
+      return 0;  // Patt: Unentschieden
+    }
+
+    return null;  // Das Spiel ist noch nicht vorbei
+  }
+
+
   String getSymbolForPiece(Schachfigur figur) {
     if (figur.isEnemy) {
       // Symbole für die gegnerischen Figuren (Schwarz)
@@ -1852,7 +1934,8 @@ class _SpielBrettState extends State<SpielBrett> {
   //    }
   //  }
 
-  int evaluateBoard(List<List<Schachfigur?>> board, MoveInfos infos) {
+ int evaluateBoard(List<List<Schachfigur?>> board) {
+
     int totalEvaluation = 0;
 
     for (int row = 0; row < 8; row++) {
