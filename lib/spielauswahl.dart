@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:schach/components/Spielart.dart';
 import 'package:schach/components/Toast.dart';
 import 'package:schach/spielbrett.dart';
+import 'package:schach/stellung_editor.dart';
 import 'package:schach/values/colors.dart';
 
 class SpielAuswahl extends StatefulWidget {
@@ -313,6 +314,20 @@ class _SpielAuswahlState extends State<SpielAuswahl> {
                 ),
               ),
             ),
+
+            ElevatedButton(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StellungEditor(),
+                  ),
+                );
+              },
+              child: const Text("Stellung aufbauen"),
+            )
+
+
 
           ],
         ),
