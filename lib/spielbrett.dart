@@ -12,13 +12,17 @@ import 'package:schach/helper/helper.dart';
 import 'package:schach/spielauswahl.dart';
 import 'package:schach/values/colors.dart';
 
+import 'chess_ai/ai_game_state.dart';
 import 'components/Enums.dart';
+import 'logic/ai_state_builder.dart';
+import 'logic/board_coordinate_mapper.dart';
 
 class SpielBrett extends StatefulWidget {
   final bool figurenfarbe;
   final int spielModus;
   final List<List<Schachfigur?>>? customBrett;
   final bool? customIsWhiteTurn;
+  final MoveInfos? customMoveInfos;
 
   const SpielBrett({
     super.key,
@@ -26,6 +30,7 @@ class SpielBrett extends StatefulWidget {
     required this.spielModus,
     this.customBrett,
     this.customIsWhiteTurn,
+    this.customMoveInfos,
   });
 
   @override
@@ -35,6 +40,8 @@ class SpielBrett extends StatefulWidget {
 class _SpielBrettState extends State<SpielBrett> {
   late bool figurenfarbe;
   late int spielModus;
+
+  late BoardCoordinateMapper mapper;
 
   late List<List<Schachfigur?>> brett;
   late List<int> brettArray;
@@ -60,6 +67,8 @@ class _SpielBrettState extends State<SpielBrett> {
 
   final ChessAi chessAi = ChessAi();
 
+  static const bool logSimulationen = false;
+
   bool _isDisposed = false;
   bool _stopComputerVsComputer = false;
 
@@ -76,6 +85,10 @@ class _SpielBrettState extends State<SpielBrett> {
 
     figurenfarbe = widget.figurenfarbe;
     spielModus = widget.spielModus;
+
+    mapper = BoardCoordinateMapper(
+      figurenfarbe: figurenfarbe,
+    );
 
     startNewGame();
   }
@@ -121,7 +134,8 @@ class _SpielBrettState extends State<SpielBrett> {
       );
 
       if (!mounted || _isDisposed || _stopComputerVsComputer) {
-        logKi("ComputerVsComputer gestoppt, weil SpielBrett nicht mehr aktiv ist.");
+        logKi(
+            "ComputerVsComputer gestoppt, weil SpielBrett nicht mehr aktiv ist.");
         return;
       }
 
@@ -145,7 +159,7 @@ class _SpielBrettState extends State<SpielBrett> {
     checkStatus = false;
     pause = false;
     isWhiteTurn = true;
-    moveInfos = null;
+    moveInfos = widget.customMoveInfos;
 
     ausgewaehlteFigur = null;
     selectedRow = -1;
@@ -158,7 +172,11 @@ class _SpielBrettState extends State<SpielBrett> {
     if (widget.customBrett != null) {
       brett = widget.customBrett!;
       brettArray = List.filled(64, 0);
-      updateBrettArrayFromGUIBoard();
+      AiStateBuilder.updateBrettArrayFromGuiBoard(
+        brettArray: brettArray,
+        brett: brett,
+        mapper: mapper,
+      );
 
       isWhiteTurn = widget.customIsWhiteTurn ?? true;
 
@@ -169,7 +187,7 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
     _setupNormalBoard();
-    // _setupTestBoard();
+
   }
 
   List<int> _findKingPosition(bool isWhiteKing) {
@@ -185,7 +203,8 @@ class _SpielBrettState extends State<SpielBrett> {
       }
     }
 
-    throw Exception("König nicht gefunden: ${isWhiteKing ? "Weiß" : "Schwarz"}");
+    throw Exception(
+        "König nicht gefunden: ${isWhiteKing ? "Weiß" : "Schwarz"}");
   }
 
   void _setupNormalBoard() {
@@ -262,22 +281,6 @@ class _SpielBrettState extends State<SpielBrett> {
     }
   }
 
-  void _setupTestBoard() {
-    _platziereFigur(5, 4, Schachfigurenart.BAUER, false, true);
-    _platziereFigur(3, 1, Schachfigurenart.KOENIG, false, true);
-
-    _platziereFigur(6, 0, Schachfigurenart.BAUER, true, false);
-    _platziereFigur(6, 1, Schachfigurenart.BAUER, true, false);
-    _platziereFigur(5, 1, Schachfigurenart.BAUER, true, false);
-    _platziereFigur(4, 1, Schachfigurenart.BAUER, true, false);
-    _platziereFigur(3, 5, Schachfigurenart.BAUER, true, false);
-
-    _platziereFigur(5, 0, Schachfigurenart.KOENIG, true, false);
-
-    whiteKingPosition = [5, 0];
-    blackKingPosition = [3, 1];
-  }
-
   void _platziereFigur(
     int row,
     int col,
@@ -294,7 +297,8 @@ class _SpielBrettState extends State<SpielBrett> {
     );
 
     brett[row][col] = figur;
-    brettArray[row * 8 + col] = isEnemy ? -_figurCode(art) : _figurCode(art);
+    brettArray[mapper.guiToAiIndex(row, col)] =
+        istWeiss ? _figurCode(art) : -_figurCode(art);
   }
 
   int _figurCode(Schachfigurenart art) {
@@ -368,7 +372,7 @@ class _SpielBrettState extends State<SpielBrett> {
 
     logSpiel("Figur ausgewählt: "
         "${brett[row][column]} "
-        "${koordinatenAnzeige(row, column)}");
+        "${mapper.koordinatenAnzeige(row, column)}");
   }
 
   bool _istGueltigesZielfeld(int row, int column) {
@@ -384,9 +388,9 @@ class _SpielBrettState extends State<SpielBrett> {
 
     logSpiel("Spielerzug: "
         "$figur "
-        "${koordinatenAnzeige(selectedRow, selectedColumn)}"
+        "${mapper.koordinatenAnzeige(selectedRow, selectedColumn)}"
         " -> "
-        "${koordinatenAnzeige(newRow, newCol)}");
+        "${mapper.koordinatenAnzeige(newRow, newCol)}");
 
     figurGeschlagenPruefung(newRow, newCol);
 
@@ -451,7 +455,11 @@ class _SpielBrettState extends State<SpielBrett> {
       validMoves = [];
     });
 
-    updateBrettArrayFromGUIBoard();
+    AiStateBuilder.updateBrettArrayFromGuiBoard(
+      brettArray: brettArray,
+      brett: brett,
+      mapper: mapper,
+    );
 
     logSpiel("Brett aktualisiert");
 
@@ -500,7 +508,7 @@ class _SpielBrettState extends State<SpielBrett> {
   ) {
     logSpiel("König bewegt: "
         "${king.toString()} "
-        "-> ${koordinatenAnzeige(newRow, newCol)}");
+        "-> ${mapper.koordinatenAnzeige(newRow, newCol)}");
 
     // Rochade prüfen
 
@@ -656,7 +664,7 @@ class _SpielBrettState extends State<SpielBrett> {
 
       logSpiel("Figur geschlagen: "
           "$figur "
-          "${koordinatenAnzeige(newRow, newCol)}");
+          "${mapper.koordinatenAnzeige(newRow, newCol)}");
 
       if (figur!.istWeiss) {
         weisseFigurenRaus.add(figur);
@@ -665,6 +673,48 @@ class _SpielBrettState extends State<SpielBrett> {
       }
     }
   }
+
+  String fileLabelForGuiCol(int col) {
+    const List<String> filesWhite = ["A", "B", "C", "D", "E", "F", "G", "H"];
+    const List<String> filesBlack = ["H", "G", "F", "E", "D", "C", "B", "A"];
+
+    return figurenfarbe ? filesWhite[col] : filesBlack[col];
+  }
+
+  String rankLabelForGuiRow(int row) {
+    return figurenfarbe ? "${8 - row}" : "${row + 1}";
+  }
+
+  String squareLabelForGuiPosition(int row, int col) {
+    return "${fileLabelForGuiCol(col)}${rankLabelForGuiRow(row)}";
+  }
+
+  Schachfigur getSchachfigurFromCode(
+      int code,
+      bool isEnemy,
+      bool istWeiss,
+      ) {
+    final int absCode = code.abs();
+
+    final Schachfigurenart art = switch (absCode) {
+      1 => Schachfigurenart.BAUER,
+      2 => Schachfigurenart.SPRINGER,
+      3 => Schachfigurenart.LAEUFER,
+      4 => Schachfigurenart.TURM,
+      5 => Schachfigurenart.DAME,
+      6 => Schachfigurenart.KOENIG,
+      _ => throw Exception("Unbekannter Figuren-Code: $code"),
+    };
+
+    return Schachfigur(
+      art: art,
+      isEnemy: isEnemy,
+      istWeiss: istWeiss,
+      hasMoved: false,
+    );
+  }
+
+  //-------------------------------------------------------------------------------------------
 
   Future<bool> checkSpielEnde() async {
     logSpiel("Prüfe Spielende");
@@ -831,18 +881,18 @@ class _SpielBrettState extends State<SpielBrett> {
     List<int> blackKingPosition,
     MoveInfos? moveInfos,
   ) {
-    logSpiel("Simulation: "
+    logSimulation("Simulation: "
         "${figur.toString()} "
-        "${koordinatenAnzeige(startRow, startCol)}"
+        "${mapper.koordinatenAnzeige(startRow, startCol)}"
         " -> "
-        "${koordinatenAnzeige(endRow, endCol)}");
+        "${mapper.koordinatenAnzeige(endRow, endCol)}");
 
     Schachfigur? originalDestinationPiece = brett[endRow][endCol];
 
     List<int>? originalKingPosition;
 
     if (figur.art == Schachfigurenart.KOENIG) {
-      logSpiel("König Simulation");
+      logSimulation("König Simulation");
 
       originalKingPosition =
           figur.istWeiss ? whiteKingPosition : blackKingPosition;
@@ -854,11 +904,11 @@ class _SpielBrettState extends State<SpielBrett> {
       }
 
       if ((originalKingPosition[1] - endCol).abs() == 2) {
-        logSpiel("Rochade Simulation");
+        logSimulation("Rochade Simulation");
 
         if (isKingInCheck(figur.istWeiss, brett, whiteKingPosition,
             blackKingPosition, moveInfos)) {
-          logSpiel("Rochade verboten "
+          logSimulation("Rochade verboten "
               "König steht im Schach");
 
           return false;
@@ -873,7 +923,7 @@ class _SpielBrettState extends State<SpielBrett> {
     if (figur.art == Schachfigurenart.BAUER &&
         isEnPassantPosible(figur, startRow, startCol, moveInfos) &&
         moveInfos?.newCol == endCol) {
-      logSpiel("En Passant Simulation");
+      logSimulation("En Passant Simulation");
 
       enPassantMove = true;
 
@@ -889,7 +939,7 @@ class _SpielBrettState extends State<SpielBrett> {
     bool kingInCheck = isKingInCheck(
         figur.istWeiss, brett, whiteKingPosition, blackKingPosition, moveInfos);
 
-    logSpiel("Simulation Ergebnis "
+    logSimulation("Simulation Ergebnis "
         "KingInCheck="
         "$kingInCheck");
 
@@ -909,7 +959,7 @@ class _SpielBrettState extends State<SpielBrett> {
       brett[moveInfos!.newRow][moveInfos.newCol] = lastPawnWhoMoves2Felder;
     }
 
-    logSpiel("Simulation Ende "
+    logSimulation("Simulation Ende "
         "Legal="
         "${!kingInCheck}");
 
@@ -1475,68 +1525,7 @@ class _SpielBrettState extends State<SpielBrett> {
     return false;
   }
 
-  String koordinatenAnzeige(int row, int col) {
-    final int r = figurenfarbe ? 8 - row : row + 1;
-
-    final List<String> filesWhite = ["A", "B", "C", "D", "E", "F", "G", "H"];
-    final List<String> filesBlack = ["H", "G", "F", "E", "D", "C", "B", "A"];
-
-    final String c = figurenfarbe ? filesWhite[col] : filesBlack[col];
-
-    return "$c$r";
-  }
-
-  Schachfigur getSchachfigurFromCode(
-    int code,
-    bool isEnemy,
-    bool istWeiss,
-  ) {
-    final int absCode = code.abs();
-
-    final Schachfigurenart art = switch (absCode) {
-      1 => Schachfigurenart.BAUER,
-      2 => Schachfigurenart.SPRINGER,
-      3 => Schachfigurenart.LAEUFER,
-      4 => Schachfigurenart.TURM,
-      5 => Schachfigurenart.DAME,
-      6 => Schachfigurenart.KOENIG,
-      _ => throw Exception("Unbekannter Figuren-Code: $code"),
-    };
-
-    return Schachfigur(
-      art: art,
-      isEnemy: isEnemy,
-      istWeiss: istWeiss,
-      hasMoved: false,
-    );
-  }
-
-  void updateBrettArrayFromGUIBoard() {
-    for (int row = 0; row < 8; row++) {
-      for (int col = 0; col < 8; col++) {
-        final Schachfigur? fig = brett[row][col];
-
-        if (fig == null) {
-          brettArray[row * 8 + col] = 0;
-        } else {
-          final int id = switch (fig.art) {
-            Schachfigurenart.BAUER => 1,
-            Schachfigurenart.SPRINGER => 2,
-            Schachfigurenart.LAEUFER => 3,
-            Schachfigurenart.TURM => 4,
-            Schachfigurenart.DAME => 5,
-            Schachfigurenart.KOENIG => 6,
-          };
-
-          brettArray[row * 8 + col] = fig.isEnemy ? -id : id;
-        }
-      }
-    }
-  }
-
-  bool isEnemyMove() {
-    return figurenfarbe != isWhiteTurn;
-  }
+  //--------------------------------------------------------------------------------------
 
   Future<bool> computerMove({bool? enemyMove}) async {
     enemyMove ??= true;
@@ -1548,10 +1537,20 @@ class _SpielBrettState extends State<SpielBrett> {
 
     logKi("KI Berechnung gestartet");
 
-    final AiMove? aiMove = chessAi.getBestMove(
-      board: List<int>.from(brettArray),
-      isEnemyMove: enemyMove,
+    final AiGameState aiState = AiStateBuilder.buildAiGameState(
+      brettArray: brettArray,
+      brett: brett,
+      enemyMove: true,
       isWhiteTurn: isWhiteTurn,
+      figurenfarbe: figurenfarbe,
+      moveInfos: moveInfos,
+      mapper: mapper,
+    );
+
+    logKi("AI State: ${aiState.debugString}");
+
+    final AiMove? aiMove = chessAi.getBestMove(
+      state: aiState,
     );
 
     if (!mounted || _isDisposed || _stopComputerVsComputer) {
@@ -1564,15 +1563,18 @@ class _SpielBrettState extends State<SpielBrett> {
       return true;
     }
 
-    final int fromRow = aiMove.fromIndex ~/ 8;
-    final int fromCol = aiMove.fromIndex % 8;
-    final int toRow = aiMove.toIndex ~/ 8;
-    final int toCol = aiMove.toIndex % 8;
+    final List<int> fromPos = mapper.aiIndexToGuiPosition(aiMove.fromIndex);
+    final List<int> toPos = mapper.aiIndexToGuiPosition(aiMove.toIndex);
+
+    final int fromRow = fromPos[0];
+    final int fromCol = fromPos[1];
+    final int toRow = toPos[0];
+    final int toCol = toPos[1];
 
     logKi(
       "Vorgeschlagener KI Zug: "
-          "${koordinatenAnzeige(fromRow, fromCol)} -> "
-          "${koordinatenAnzeige(toRow, toCol)}",
+      "${mapper.koordinatenAnzeige(fromRow, fromCol)} -> "
+      "${mapper.koordinatenAnzeige(toRow, toCol)}",
     );
 
     Schachfigur? figur = brett[fromRow][fromCol];
@@ -1625,8 +1627,8 @@ class _SpielBrettState extends State<SpielBrett> {
 
     logKi(
       "Computer bewegt: ${figur.toString()} von "
-          "${koordinatenAnzeige(fromRow, fromCol)} zu "
-          "${koordinatenAnzeige(toRow, toCol)}",
+      "${mapper.koordinatenAnzeige(fromRow, fromCol)} zu "
+      "${mapper.koordinatenAnzeige(toRow, toCol)}",
     );
 
     if (figur.art == Schachfigurenart.KOENIG) {
@@ -1672,7 +1674,11 @@ class _SpielBrettState extends State<SpielBrett> {
     brett[toRow][toCol] = figur;
     brett[fromRow][fromCol] = null;
 
-    updateBrettArrayFromGUIBoard();
+    AiStateBuilder.updateBrettArrayFromGuiBoard(
+      brettArray: brettArray,
+      brett: brett,
+      mapper: mapper,
+    );
 
     logKi("KI Brett aktualisiert");
 
@@ -1702,11 +1708,11 @@ class _SpielBrettState extends State<SpielBrett> {
     logKi("Prüfe KI Zug");
 
     if (brett[fromRow][fromCol] == null) {
-      return "Auf dem Startfeld ${koordinatenAnzeige(fromRow, fromCol)} steht keine Figur.";
+      return "Auf dem Startfeld ${mapper.koordinatenAnzeige(fromRow, fromCol)} steht keine Figur.";
     }
 
     if (_figurCode(figur.art) != aiMove.piece.abs()) {
-      return "Die Figur auf ${koordinatenAnzeige(fromRow, fromCol)} passt nicht zum KI-Zug. "
+      return "Die Figur auf ${mapper.koordinatenAnzeige(fromRow, fromCol)} passt nicht zum KI-Zug. "
           "Erwarteter Code: ${aiMove.piece}, gefunden: ${figur.toString()}.";
     }
 
@@ -1722,7 +1728,7 @@ class _SpielBrettState extends State<SpielBrett> {
     );
 
     logKi("Legale Ziele: "
-        "${erlaubteZuege.map((e) => koordinatenAnzeige(e[0], e[1])).join(", ")}");
+        "${erlaubteZuege.map((e) => mapper.koordinatenAnzeige(e[0], e[1])).join(", ")}");
 
     final bool zugLegal = erlaubteZuege.any(
       (zug) => zug[0] == toRow && zug[1] == toCol,
@@ -1730,9 +1736,9 @@ class _SpielBrettState extends State<SpielBrett> {
 
     if (!zugLegal) {
       return "${figur.toString()} darf nicht von "
-          "${koordinatenAnzeige(fromRow, fromCol)} nach "
-          "${koordinatenAnzeige(toRow, toCol)} ziehen, weil dieser Zug nach der Spielbrett-Logik nicht legal ist. "
-          "Mögliche legale Ziele wären: ${erlaubteZuege.map((z) => koordinatenAnzeige(z[0], z[1])).join(", ")}.";
+          "${mapper.koordinatenAnzeige(fromRow, fromCol)} nach "
+          "${mapper.koordinatenAnzeige(toRow, toCol)} ziehen, weil dieser Zug nach der Spielbrett-Logik nicht legal ist. "
+          "Mögliche legale Ziele wären: ${erlaubteZuege.map((z) => mapper.koordinatenAnzeige(z[0], z[1])).join(", ")}.";
     }
 
     logKi("KI Zug legal");
@@ -1740,12 +1746,22 @@ class _SpielBrettState extends State<SpielBrett> {
     return null;
   }
 
+  //--------------------------------------------------------------------------------------
+
   void logSpiel(String text) {
     debugPrint("[Spiel ${DateTime.now().toIso8601String()}] $text");
   }
 
   void logKi(String text) {
     debugPrint("[KI ${DateTime.now().toIso8601String()}] $text");
+  }
+
+  void logSimulation(String text) {
+    if (!logSimulationen) return;
+
+    debugPrint(
+      "[Simulation ${DateTime.now().toIso8601String()}] $text",
+    );
   }
 
   @override
@@ -1761,6 +1777,7 @@ class _SpielBrettState extends State<SpielBrett> {
                 Navigator.pop(context);
               },
               onTapJa: () async {
+                _stopComputerVsComputer = true;
                 Navigator.pop(context);
                 await Navigator.pushReplacement(
                   context,
@@ -1919,19 +1936,59 @@ class _SpielBrettState extends State<SpielBrett> {
                       isCheckmate = true;
                     }
 
-                    return Feld(
-                      istWeiss: istWeiss(index),
-                      figur: brett[row][col],
-                      ausgewaehlt: ausgewaehlt,
-                      isValidMove: isValidMove,
-                      canBeTakenOut: canBeTakenOut,
-                      lastMoveFrom: lastMoveFrom,
-                      lastMoveTo: lastMoveTo,
-                      kingInCheck: kingInCheck,
-                      isCheckmate: isCheckmate,
-                      onTap: () {
-                        figurAusgewaehlt(row, col);
-                      },
+                    final bool showRank = col == 0;
+                    final bool showFile = row == 7;
+
+                    final bool lightSquare = istWeiss(index);
+
+                    final Color coordinateColor =
+                        lightSquare ? Colors.black54 : Colors.white70;
+
+                    return Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Feld(
+                            istWeiss: lightSquare,
+                            figur: brett[row][col],
+                            ausgewaehlt: ausgewaehlt,
+                            isValidMove: isValidMove,
+                            canBeTakenOut: canBeTakenOut,
+                            lastMoveFrom: lastMoveFrom,
+                            lastMoveTo: lastMoveTo,
+                            kingInCheck: kingInCheck,
+                            isCheckmate: isCheckmate,
+                            onTap: () {
+                              figurAusgewaehlt(row, col);
+                            },
+                          ),
+                        ),
+                        if (showRank)
+                          Positioned(
+                            top: 3,
+                            left: 4,
+                            child: Text(
+                              rankLabelForGuiRow(row),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: coordinateColor,
+                              ),
+                            ),
+                          ),
+                        if (showFile)
+                          Positioned(
+                            right: 4,
+                            bottom: 2,
+                            child: Text(
+                              fileLabelForGuiCol(col),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: coordinateColor,
+                              ),
+                            ),
+                          ),
+                      ],
                     );
                   },
                 ),

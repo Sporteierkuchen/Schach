@@ -1,3 +1,4 @@
+import 'ai_game_state.dart';
 import 'ai_move.dart';
 import 'board_evaluator.dart';
 import 'minimax_engine.dart';
@@ -19,19 +20,15 @@ class ChessAi {
   );
 
   AiMove? getBestMove({
-    required List<int> board,
-    required bool isEnemyMove,
-    required bool isWhiteTurn,
+    required AiGameState state,
   }) {
     transpositionTable.clear();
 
-    final int depth = calculateDynamicDepth(board);
+    final int depth = calculateDynamicDepth(state.board);
 
     return minimaxEngine.findBestMove(
-      board: List<int>.from(board),
+      state: state,
       depth: depth,
-      isEnemyMove: isEnemyMove,
-      isWhiteTurn: isWhiteTurn,
     );
   }
 
