@@ -13,6 +13,7 @@ import 'package:schach/spielauswahl.dart';
 import 'package:schach/values/colors.dart';
 
 import 'chess_ai/ai_game_state.dart';
+import 'chess_ai/board_helper.dart';
 import 'components/Enums.dart';
 import 'logic/ai_state_builder.dart';
 import 'logic/board_coordinate_mapper.dart';
@@ -61,6 +62,7 @@ class _SpielBrettState extends State<SpielBrett> {
   bool pause = false;
 
   MoveInfos? moveInfos;
+  List<String> moveHistory = [];
 
   late List<int> whiteKingPosition;
   late List<int> blackKingPosition;
@@ -160,6 +162,7 @@ class _SpielBrettState extends State<SpielBrett> {
     pause = false;
     isWhiteTurn = true;
     moveInfos = widget.customMoveInfos;
+    moveHistory.clear();
 
     ausgewaehlteFigur = null;
     selectedRow = -1;
@@ -391,6 +394,30 @@ class _SpielBrettState extends State<SpielBrett> {
         "${mapper.koordinatenAnzeige(selectedRow, selectedColumn)}"
         " -> "
         "${mapper.koordinatenAnzeige(newRow, newCol)}");
+
+    final int fromIndex =
+    mapper.guiToAiIndex(
+      selectedRow,
+      selectedColumn,
+    );
+
+    final int toIndex =
+    mapper.guiToAiIndex(
+      newRow,
+      newCol,
+    );
+
+    moveHistory.add(
+      createUciMove(
+        fromIndex,
+        toIndex,
+      ),
+    );
+
+    logSpiel(
+      "History: "
+          "${moveHistory.last}",
+    );
 
     figurGeschlagenPruefung(newRow, newCol);
 
@@ -712,6 +739,14 @@ class _SpielBrettState extends State<SpielBrett> {
       istWeiss: istWeiss,
       hasMoved: false,
     );
+  }
+
+  String createUciMove(
+      int fromIndex,
+      int toIndex,
+      ) {
+    return BoardHelper.indexToCoord(fromIndex) +
+        BoardHelper.indexToCoord(toIndex);
   }
 
   //-------------------------------------------------------------------------------------------
@@ -1192,18 +1227,24 @@ class _SpielBrettState extends State<SpielBrett> {
         }
         break;
       case Schachfigurenart.KOENIG:
+
         var directions = [
-          [-1, 0], // up
-          [1, 0], // down
-          [0, -1], // left
-          [0, 1], // right
-          [-1, -1], // up left
-          [-1, 1], // up right
-          [1, -1], // down left
-          [1, 1], // down right
+
+          [-1,0],
+          [1,0],
+
+          [0,-1],
+          [0,1],
+
+          [-1,-1],
+          [-1,1],
+
+          [1,-1],
+          [1,1],
         ];
 
         for (var direction in directions) {
+
           var newRow = row + direction[0];
           var newCol = col + direction[1];
 
@@ -1212,67 +1253,54 @@ class _SpielBrettState extends State<SpielBrett> {
           }
 
           if (brett[newRow][newCol] != null) {
+
             if (brett[newRow][newCol]!.istWeiss != schachfigur.istWeiss) {
-              canidateMoves.add([newRow, newCol]); // capture
+              canidateMoves.add([newRow, newCol,]);
             }
-            continue; // blocked
+            continue;
           }
 
-          canidateMoves.add([newRow, newCol]);
+          canidateMoves.add([newRow, newCol,]);
         }
 
-        // Short castle
-        if (schachfigur.isEnemy &&
-            schachfigur.istWeiss &&
-            isShortCastlePossible(schachfigur, brett) &&
-            row == 0 &&
-            col == 3) {
-          canidateMoves.add([0, 1]);
-        } else if (schachfigur.isEnemy &&
-            !schachfigur.istWeiss &&
-            isShortCastlePossible(schachfigur, brett) &&
-            row == 0 &&
-            col == 4) {
-          canidateMoves.add([0, 6]);
-        } else if (!schachfigur.isEnemy &&
-            schachfigur.istWeiss &&
-            isShortCastlePossible(schachfigur, brett) &&
-            row == 7 &&
-            col == 4) {
-          canidateMoves.add([7, 6]);
-        } else if (!schachfigur.isEnemy &&
-            !schachfigur.istWeiss &&
-            isShortCastlePossible(schachfigur, brett) &&
-            row == 7 &&
-            col == 3) {
-          canidateMoves.add([7, 1]);
+        bool safeShort = _canCastleSafely(schachfigur, row, col, col + 2);
+
+        bool safeLong = _canCastleSafely(schachfigur, row, col, col - 2);
+
+        // kurze Rochade
+        if (schachfigur.isEnemy && schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && safeShort && row == 0 && col == 3) {
+
+          canidateMoves.add([0, 1,]);
+
+        } else if (schachfigur.isEnemy && !schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && safeShort && row == 0 && col == 4) {
+
+          canidateMoves.add([0, 6,]);
+
+        } else if (!schachfigur.isEnemy && schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && safeShort && row == 7 && col == 4) {
+
+          canidateMoves.add([7, 6,]);
+
+        } else if (!schachfigur.isEnemy && !schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && safeShort && row == 7 && col == 3) {
+
+          canidateMoves.add([7, 1,]);
         }
 
-        // Long castle
-        if (schachfigur.isEnemy &&
-            schachfigur.istWeiss &&
-            isLongCastlePossible(schachfigur, brett) &&
-            row == 0 &&
-            col == 3) {
-          canidateMoves.add([0, 5]);
-        } else if (schachfigur.isEnemy &&
-            !schachfigur.istWeiss &&
-            isLongCastlePossible(schachfigur, brett) &&
-            row == 0 &&
-            col == 4) {
-          canidateMoves.add([0, 2]);
-        } else if (!schachfigur.isEnemy &&
-            schachfigur.istWeiss &&
-            isLongCastlePossible(schachfigur, brett) &&
-            row == 7 &&
-            col == 4) {
-          canidateMoves.add([7, 2]);
-        } else if (!schachfigur.isEnemy &&
-            !schachfigur.istWeiss &&
-            isLongCastlePossible(schachfigur, brett) &&
-            row == 7 &&
-            col == 3) {
-          canidateMoves.add([7, 5]);
+        // lange Rochade
+        if (schachfigur.isEnemy && schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && safeLong && row == 0 && col == 3) {
+
+          canidateMoves.add([0, 5,]);
+
+        } else if (schachfigur.isEnemy && !schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && safeLong && row == 0 && col == 4) {
+
+          canidateMoves.add([0, 2,]);
+
+        } else if (!schachfigur.isEnemy && schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && safeLong && row == 7 && col == 4) {
+
+          canidateMoves.add([7, 2,]);
+
+        } else if (!schachfigur.isEnemy && !schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && safeLong && row == 7 && col == 3) {
+
+          canidateMoves.add([7, 5,]);
         }
 
         break;
@@ -1391,6 +1419,100 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
     return false;
+  }
+
+  bool _canCastleSafely(Schachfigur king, int row, int fromCol, int toCol) {
+    // König darf nicht aktuell im Schach stehen
+    if (_isSquareControlledByOpponent(row, fromCol, king.istWeiss,)) {
+      return false;
+    }
+
+    final int step = toCol > fromCol ? 1 : -1;
+
+    int col = fromCol + step;
+
+    while (col != toCol + step) {
+      if (_isSquareControlledByOpponent(row, col, king.istWeiss,)) {
+        return false;
+      }
+
+      col += step;
+    }
+
+    return true;
+  }
+
+  bool _isSquareControlledByOpponent(int targetRow, int targetCol, bool isWhiteKing,) {
+    for (int row = 0; row < 8; row++) {
+      for (int col = 0; col < 8; col++) {
+        final Schachfigur? figur = brett[row][col];
+
+        if (figur == null) continue;
+        if (figur.istWeiss == isWhiteKing) continue;
+
+        if (_pieceControlsSquare(figur, row, col, targetRow, targetCol,)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  bool _pieceControlsSquare(Schachfigur figur, int row, int col, int targetRow, int targetCol,) {
+    final int rowDiff = targetRow - row;
+    final int colDiff = targetCol - col;
+
+    switch (figur.art) {
+      case Schachfigurenart.BAUER:
+        final int direction = figur.isEnemy ? 1 : -1;
+
+        return rowDiff == direction && colDiff.abs() == 1;
+
+      case Schachfigurenart.SPRINGER:
+        return (rowDiff.abs() == 2 && colDiff.abs() == 1) ||
+            (rowDiff.abs() == 1 && colDiff.abs() == 2);
+
+      case Schachfigurenart.KOENIG:
+        return rowDiff.abs() <= 1 && colDiff.abs() <= 1;
+
+      case Schachfigurenart.LAEUFER:
+        if (rowDiff.abs() != colDiff.abs()) return false;
+
+        return _pathClear(row, col, targetRow, targetCol,);
+
+      case Schachfigurenart.TURM:
+        if (row != targetRow && col != targetCol) return false;
+
+        return _pathClear(row, col, targetRow, targetCol,);
+
+      case Schachfigurenart.DAME:
+        final bool diagonal = rowDiff.abs() == colDiff.abs();
+        final bool straight = row == targetRow || col == targetCol;
+
+        if (!diagonal && !straight) return false;
+
+        return _pathClear(row, col, targetRow, targetCol,);
+    }
+  }
+
+  bool _pathClear(int fromRow, int fromCol, int toRow, int toCol,) {
+    final int rowStep = (toRow - fromRow).sign;
+    final int colStep = (toCol - fromCol).sign;
+
+    int row = fromRow + rowStep;
+    int col = fromCol + colStep;
+
+    while (row != toRow || col != toCol) {
+      if (brett[row][col] != null) {
+        return false;
+      }
+
+      row += rowStep;
+      col += colStep;
+    }
+
+    return true;
   }
 
   bool isCheckMate(bool isWhiteKing) {
@@ -1551,6 +1673,7 @@ class _SpielBrettState extends State<SpielBrett> {
 
     final AiMove? aiMove = chessAi.getBestMove(
       state: aiState,
+      moveHistory: moveHistory,
     );
 
     if (!mounted || _isDisposed || _stopComputerVsComputer) {
@@ -1611,6 +1734,17 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
     logKi("KI Zug akzeptiert");
+
+    moveHistory.add(
+      createUciMove(
+        aiMove.fromIndex,
+        aiMove.toIndex,
+      ),
+    );
+
+    logKi(
+      "History KI: ${moveHistory.last}",
+    );
 
     await warten(
       spielModus == -1

@@ -1,3 +1,5 @@
+import '../services/opening_book.dart';
+import '../services/opening_book_service.dart';
 import 'ai_game_state.dart';
 import 'ai_move.dart';
 import 'board_evaluator.dart';
@@ -12,6 +14,8 @@ class ChessAi {
   late final MoveOrdering moveOrdering = MoveOrdering(evaluator);
   final TranspositionTable transpositionTable = TranspositionTable();
 
+  final openingBookService = OpeningBookService();
+
   late final MinimaxEngine minimaxEngine = MinimaxEngine(
     moveGenerator: moveGenerator,
     evaluator: evaluator,
@@ -21,24 +25,79 @@ class ChessAi {
 
   AiMove? getBestMove({
     required AiGameState state,
+    required List<String> moveHistory,
+    int timeLimitMs = 4000,
+    int aiLevel=5,
+    OpeningStyle style= OpeningStyle.balanced,
   }) {
+
+    final AiMove? bookMove = openingBookService.findBookMove(
+      state:state,
+      moveHistory: moveHistory,
+      moveGenerator: moveGenerator,
+      moveOrdering: moveOrdering,
+      aiLevel: aiLevel,
+      style: style,
+    );
+
+    if (bookMove != null) {
+      print("📖 KI spielt Eröffnungsbuchzug");
+      return bookMove;
+    }
+
     transpositionTable.clear();
 
-    final int depth = calculateDynamicDepth(state.board);
+    final Stopwatch stopwatch = Stopwatch()..start();
 
-    return minimaxEngine.findBestMove(
-      state: state,
-      depth: depth,
+    AiMove? bestMove;
+
+    final int maxDepth = calculateMaxDepth(state.board);
+
+    for (int depth = 1; depth <= maxDepth; depth++) {
+      if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
+        break;
+      }
+
+      final AiMove? move = minimaxEngine.findBestMoveTimed(
+        state: state,
+        depth: depth,
+        stopwatch: stopwatch,
+        timeLimitMs: timeLimitMs,
+      );
+
+      if (move == null) {
+        break;
+      }
+
+      bestMove = move;
+
+      print(
+        "✅ Iterative Deepening Tiefe $depth fertig | "
+            "Move: ${move.fromIndex} -> ${move.toIndex} | "
+            "Score: ${move.score} | "
+            "Zeit: ${stopwatch.elapsedMilliseconds} ms",
+      );
+    }
+
+    stopwatch.stop();
+
+    print(
+      "🏁 KI fertig | "
+          "Zeit: ${stopwatch.elapsedMilliseconds} ms | "
+          "TT: ${transpositionTable.size}",
     );
+
+    return bestMove;
   }
 
-  int calculateDynamicDepth(List<int> board) {
+  int calculateMaxDepth(List<int> board) {
     final int pieces = board.where((piece) => piece != 0).length;
 
-    if (pieces <= 6) return 6;
-    if (pieces <= 10) return 5;
-    if (pieces <= 16) return 4;
+    if (pieces <= 6) return 9;
+    if (pieces <= 10) return 8;
+    if (pieces <= 16) return 7;
+    if (pieces <= 24) return 6;
 
-    return 3;
+    return 5;
   }
 }
