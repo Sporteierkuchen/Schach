@@ -1421,8 +1421,15 @@ class _SpielBrettState extends State<SpielBrett> {
     return false;
   }
 
-  bool _canCastleSafely(Schachfigur king, int row, int fromCol, int toCol) {
-    // König darf nicht aktuell im Schach stehen
+  bool _canCastleSafely(Schachfigur king, int row, int fromCol, int toCol,) {
+    if (!isInBoard(row, fromCol)) {
+      return false;
+    }
+
+    if (!isInBoard(row, toCol)) {
+      return false;
+    }
+
     if (_isSquareControlledByOpponent(row, fromCol, king.istWeiss,)) {
       return false;
     }
@@ -1432,6 +1439,10 @@ class _SpielBrettState extends State<SpielBrett> {
     int col = fromCol + step;
 
     while (col != toCol + step) {
+      if (!isInBoard(row, col)) {
+        return false;
+      }
+
       if (_isSquareControlledByOpponent(row, col, king.istWeiss,)) {
         return false;
       }
@@ -1497,6 +1508,14 @@ class _SpielBrettState extends State<SpielBrett> {
   }
 
   bool _pathClear(int fromRow, int fromCol, int toRow, int toCol,) {
+    if (!isInBoard(fromRow, fromCol)) {
+      return false;
+    }
+
+    if (!isInBoard(toRow, toCol)) {
+      return false;
+    }
+
     final int rowStep = (toRow - fromRow).sign;
     final int colStep = (toCol - fromCol).sign;
 
@@ -1504,6 +1523,10 @@ class _SpielBrettState extends State<SpielBrett> {
     int col = fromCol + colStep;
 
     while (row != toRow || col != toCol) {
+      if (!isInBoard(row, col)) {
+        return false;
+      }
+
       if (brett[row][col] != null) {
         return false;
       }

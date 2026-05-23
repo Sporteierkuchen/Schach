@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:schach/chess_ai/search_heuristics.dart';
+
 import 'ai_game_state.dart';
 import 'ai_move.dart';
 import 'board_evaluator.dart';
@@ -21,6 +23,8 @@ class MinimaxEngine {
 
   int searchedNodes = 0;
 
+  final SearchHeuristics heuristics = SearchHeuristics();
+
   MinimaxEngine({
     required this.moveGenerator,
     required this.evaluator,
@@ -37,6 +41,7 @@ class MinimaxEngine {
     final List<AiMove> legalMoves = _getOrderedMoves(
       state: state,
       hashEntry: null,
+      ply: 0,
     );
 
     if (legalMoves.isEmpty) {
@@ -117,12 +122,17 @@ class MinimaxEngine {
     required int timeLimitMs,
   }) {
 
+    if (depth == 1) {
+      heuristics.clear();
+    }
+
     searchedNodes = 0;
 
     final List<AiMove> legalMoves =
     _getOrderedMoves(
       state: state,
       hashEntry: null,
+      ply: 0,
     );
 
     if (legalMoves.isEmpty) {
@@ -323,6 +333,7 @@ class MinimaxEngine {
     _getOrderedMoves(
       state: state,
       hashEntry: entry,
+      ply: ply,
     );
 
     if (moves.isEmpty) {
@@ -439,9 +450,7 @@ class MinimaxEngine {
 
     searchedNodes++;
 
-    final int key = _buildTranspositionKey(
-      state: state,
-    );
+    final int key = _buildTranspositionKey(state: state);
 
     final int originalAlpha = alpha;
     final int originalBeta = beta;
@@ -467,26 +476,15 @@ class MinimaxEngine {
       }
     }
 
-    final int? whiteKingIndex = BoardHelper.getKingIndex(
-      state.board,
-      true,
-    );
-
-    final int? blackKingIndex = BoardHelper.getKingIndex(
-      state.board,
-      false,
-    );
+    final int? whiteKingIndex = BoardHelper.getKingIndex(state.board, true);
+    final int? blackKingIndex = BoardHelper.getKingIndex(state.board, false);
 
     if (whiteKingIndex == null || blackKingIndex == null) {
       return evaluator.evaluate(state.board);
     }
 
     if (moveGenerator.isCheckmate(state: state)) {
-      if (state.isWhiteTurn) {
-        return -mateScore + ply;
-      }
-
-      return mateScore - ply;
+      return state.isWhiteTurn ? -mateScore + ply : mateScore - ply;
     }
 
     if (moveGenerator.isStalemate(state: state)) {
@@ -509,6 +507,7 @@ class MinimaxEngine {
     final List<AiMove> moves = _getOrderedMoves(
       state: state,
       hashEntry: entry,
+      ply: ply,
     );
 
     if (moves.isEmpty) {
@@ -548,6 +547,11 @@ class MinimaxEngine {
         localAlpha = max(localAlpha, bestScore);
 
         if (localAlpha >= localBeta) {
+          if (state.board[move.toIndex] == 0) {
+            heuristics.addKillerMove(move, ply);
+            heuristics.addHistoryScore(move, depth);
+          }
+
           break;
         }
       }
@@ -593,6 +597,11 @@ class MinimaxEngine {
         localBeta = min(localBeta, bestScore);
 
         if (localAlpha >= localBeta) {
+          if (state.board[move.toIndex] == 0) {
+            heuristics.addKillerMove(move, ply);
+            heuristics.addHistoryScore(move, depth);
+          }
+
           break;
         }
       }
@@ -655,6 +664,7 @@ class MinimaxEngine {
     _getOrderedMoves(
       state: state,
       hashEntry: null,
+      ply: 0,
     ).where((AiMove move) {
 
       return state.board[
@@ -709,6 +719,7 @@ class MinimaxEngine {
   List<AiMove> _getOrderedMoves({
     required AiGameState state,
     required TranspositionEntry? hashEntry,
+    int ply = 0,
   }) {
 
     final groupedMoves =
@@ -722,6 +733,8 @@ class MinimaxEngine {
       hashFrom: hashEntry?.bestFrom,
       hashTo: hashEntry?.bestTo,
       hashPromotion: hashEntry?.bestPromotion,
+      heuristics: heuristics,
+      ply: ply,
     );
   }
 

@@ -6,6 +6,8 @@ class BoardEvaluator {
   int evaluate(List<int> board) {
     int score = 0;
 
+    //debugValidateTables();
+
     final bool endgame = _isEndgame(board);
 
     for (int i = 0; i < 64; i++) {
@@ -19,6 +21,7 @@ class BoardEvaluator {
 
     score += pawnStructureScore(board);
     score += kingSafetyScore(board, endgame);
+    //score += hangingPieceScore(board);
 
     return score;
   }
@@ -40,6 +43,205 @@ class BoardEvaluator {
       default:
         return 0;
     }
+  }
+
+  int hangingPieceScore(List<int> board) {
+    int score = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece == 0) continue;
+      if (piece.abs() == 6) continue;
+
+      final bool isWhite = piece > 0;
+
+      final int attackers = _countAttackers(
+        board,
+        i,
+        isWhite,
+      );
+
+      if (attackers == 0) continue;
+
+      final int defenders = _countDefenders(
+        board,
+        i,
+        isWhite,
+      );
+
+      final int value = pieceValue(piece).abs();
+
+      int penalty = 0;
+
+      if (defenders == 0) {
+        penalty = value ~/ 3;
+      } else if (attackers > defenders) {
+        penalty = value ~/ 5;
+      } else {
+        penalty = value ~/ 12;
+      }
+
+      if (piece.abs() == 1) {
+        penalty ~/= 2;
+      }
+
+      if (isWhite) {
+        score -= penalty;
+      } else {
+        score += penalty;
+      }
+    }
+
+    return score;
+  }
+
+  int _countAttackers(
+      List<int> board,
+      int targetIndex,
+      bool targetIsWhite,
+      ) {
+    int count = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece == 0) continue;
+      if ((piece > 0) == targetIsWhite) continue;
+
+      if (_pieceControlsSquare(
+        board,
+        i,
+        piece,
+        targetIndex,
+      )) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  int _countDefenders(
+      List<int> board,
+      int targetIndex,
+      bool targetIsWhite,
+      ) {
+    int count = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece == 0) continue;
+      if (i == targetIndex) continue;
+      if ((piece > 0) != targetIsWhite) continue;
+
+      if (_pieceControlsSquare(
+        board,
+        i,
+        piece,
+        targetIndex,
+      )) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  bool _pieceControlsSquare(
+      List<int> board,
+      int fromIndex,
+      int piece,
+      int targetIndex,
+      ) {
+    final int fromRow = BoardHelper.getRow(fromIndex);
+    final int fromCol = BoardHelper.getCol(fromIndex);
+    final int targetRow = BoardHelper.getRow(targetIndex);
+    final int targetCol = BoardHelper.getCol(targetIndex);
+
+    final int rowDiff = targetRow - fromRow;
+    final int colDiff = targetCol - fromCol;
+
+    switch (piece.abs()) {
+      case 1:
+        final int direction = piece > 0 ? -1 : 1;
+        return rowDiff == direction && colDiff.abs() == 1;
+
+      case 2:
+        return (rowDiff.abs() == 2 && colDiff.abs() == 1) ||
+            (rowDiff.abs() == 1 && colDiff.abs() == 2);
+
+      case 3:
+        if (rowDiff.abs() != colDiff.abs()) return false;
+        return _pathClear(
+          board,
+          fromRow,
+          fromCol,
+          targetRow,
+          targetCol,
+        );
+
+      case 4:
+        if (fromRow != targetRow && fromCol != targetCol) return false;
+        return _pathClear(
+          board,
+          fromRow,
+          fromCol,
+          targetRow,
+          targetCol,
+        );
+
+      case 5:
+        final bool diagonal = rowDiff.abs() == colDiff.abs();
+        final bool straight = fromRow == targetRow || fromCol == targetCol;
+
+        if (!diagonal && !straight) return false;
+
+        return _pathClear(
+          board,
+          fromRow,
+          fromCol,
+          targetRow,
+          targetCol,
+        );
+
+      case 6:
+        return rowDiff.abs() <= 1 && colDiff.abs() <= 1;
+
+      default:
+        return false;
+    }
+  }
+
+  bool _pathClear(
+      List<int> board,
+      int fromRow,
+      int fromCol,
+      int toRow,
+      int toCol,
+      ) {
+    final int rowStep = (toRow - fromRow).sign;
+    final int colStep = (toCol - fromCol).sign;
+
+    int row = fromRow + rowStep;
+    int col = fromCol + colStep;
+
+    while (row != toRow || col != toCol) {
+      final int index = BoardHelper.getIndex(
+        row,
+        col,
+      );
+
+      if (board[index] != 0) {
+        return false;
+      }
+
+      row += rowStep;
+      col += colStep;
+    }
+
+    return true;
   }
 
   int positionalBonus(
@@ -76,6 +278,16 @@ class BoardEvaluator {
     }
 
     return piece > 0 ? bonus : -bonus;
+  }
+
+  void debugValidateTables() {
+    print("pawn: ${_pawnTable.length}");
+    print("knight: ${_knightTable.length}");
+    print("bishop: ${_bishopTable.length}");
+    print("rook: ${_rookTable.length}");
+    print("queen: ${_queenTable.length}");
+    print("kingMiddle: ${_kingMiddleGameTable.length}");
+    print("kingEnd: ${_kingEndgameTable.length}");
   }
 
   int mobilityBonus(
@@ -326,7 +538,6 @@ class BoardEvaluator {
       int index,
       ) {
     final int absPiece = piece.abs();
-    final bool white = piece > 0;
 
     int count = 0;
 
@@ -400,7 +611,7 @@ class BoardEvaluator {
       }
     }
 
-    return white ? count : count;
+    return count;
   }
 
   bool _isEnemy(
@@ -408,8 +619,7 @@ class BoardEvaluator {
       int target,
       ) {
     return target != 0 &&
-        ((piece > 0 && target < 0) ||
-            (piece < 0 && target > 0));
+        ((piece > 0 && target < 0) || (piece < 0 && target > 0));
   }
 
   static const List<int> _pawnTable = [
@@ -478,6 +688,17 @@ class BoardEvaluator {
     20, 30, 10, 0, 0, 10, 30, 20,
   ];
 
+/*  static const List<int> _kingEndgameTable = [
+    -50, -30, -30, -30, -30, -30, -30, -50,
+    -30, -10, 0, 0, 0, 0, -10, -30,
+    -30, 0, 20, 30, 30, 20, 0, -30,
+    -30, 0, 30, 40, 40, 30, 0, -30,
+    -30, 0, 30, 40, 40, 30, 0, -30,
+    -30, 0, 20, 30, 30, 20, 0, -30,
+    -30, -10, 0, 0, 0, 0, -10, -30,
+    -50, -30, -30, -30, -30, -30, -50,
+  ];*/
+
   static const List<int> _kingEndgameTable = [
     -50, -30, -30, -30, -30, -30, -30, -50,
     -30, -10, 0, 0, 0, 0, -10, -30,
@@ -488,4 +709,5 @@ class BoardEvaluator {
     -30, -10, 0, 0, 0, 0, -10, -30,
     -50, -30, -30, -30, -30, -30, -30, -50,
   ];
+
 }
