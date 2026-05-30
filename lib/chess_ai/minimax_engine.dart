@@ -135,6 +135,28 @@ class MinimaxEngine {
       ply: 0,
     );
 
+/*    print("===== ROOT LEGAL MOVES =====");
+
+    for (final AiMove move in legalMoves) {
+      final bool castle =
+          move.piece.abs() == 6 &&
+              (BoardHelper.getCol(move.fromIndex) -
+                  BoardHelper.getCol(move.toIndex))
+                  .abs() ==
+                  2;
+
+      if (castle) {
+        print(
+          "ROOT CASTLE: "
+              "${BoardHelper.indexToCoord(move.fromIndex)}"
+              " -> "
+              "${BoardHelper.indexToCoord(move.toIndex)}",
+        );
+      }
+    }
+
+    print("============================");*/
+
     if (legalMoves.isEmpty) {
       return null;
     }
@@ -157,8 +179,7 @@ class MinimaxEngine {
         move: move,
       );
 
-      final int score =
-      minimaxTimed(
+      int score = minimaxTimed(
         state: nextState,
         depth: depth - 1,
         alpha: alpha,
@@ -166,6 +187,12 @@ class MinimaxEngine {
         ply: 1,
         stopwatch: stopwatch,
         timeLimitMs: timeLimitMs,
+      );
+
+      score += _rootMoveSafetyAdjustment(
+        beforeState: state,
+        afterState: nextState,
+        move: move,
       );
 
       if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
@@ -221,6 +248,16 @@ class MinimaxEngine {
           "Nodes: $searchedNodes | "
           "Zeit: ${stopwatch.elapsedMilliseconds} ms",
     );
+
+    if (bestMove != null) {
+      final String pv = getPrincipalVariationFromMove(
+        state,
+        bestMove,
+        depth,
+      );
+
+      print("📌 PV Tiefe $depth: $pv");
+    }
 
     return bestMove;
   }
@@ -963,4 +1000,245 @@ class MinimaxEngine {
     );
   }
 
+
+  int _rootMoveSafetyAdjustment({
+    required AiGameState beforeState,
+    required AiGameState afterState,
+    required AiMove move,
+  }) {
+    final int movedPiece =
+    afterState.board[move.toIndex];
+
+    if (movedPiece == 0) {
+      return 0;
+    }
+
+    if (movedPiece.abs() == 6) {
+      return 0;
+    }
+
+    final int pieceValue =
+    evaluator.pieceValue(movedPiece).abs();
+
+    final bool movedPieceIsWhite =
+        movedPiece > 0;
+
+    final bool attacked =
+    _isSquareAttackedBySide(
+      afterState.board,
+      move.toIndex,
+      byWhite: !movedPieceIsWhite,
+    );
+
+    if (!attacked) {
+      return 0;
+    }
+
+    final bool defended =
+    _isSquareAttackedBySide(
+      afterState.board,
+      move.toIndex,
+      byWhite: movedPieceIsWhite,
+    );
+
+    int penalty = 0;
+
+    if (!defended) {
+      penalty = pieceValue ~/ 2;
+    } else {
+      penalty = pieceValue ~/ 5;
+    }
+
+    if (move.promotionPiece != null) {
+      penalty ~/= 2;
+    }
+
+    return movedPieceIsWhite
+        ? -penalty
+        : penalty;
+  }
+
+  bool _isSquareAttackedBySide(
+      List<int> board,
+      int targetIndex, {
+        required bool byWhite,
+      }) {
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece == 0) continue;
+      if ((piece > 0) != byWhite) continue;
+
+      if (_pieceControlsSquare(
+        board,
+        i,
+        piece,
+        targetIndex,
+      )) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool _pieceControlsSquare(
+      List<int> board,
+      int fromIndex,
+      int piece,
+      int targetIndex,
+      ) {
+    final int fromRow = fromIndex ~/ 8;
+    final int fromCol = fromIndex % 8;
+
+    final int targetRow = targetIndex ~/ 8;
+    final int targetCol = targetIndex % 8;
+
+    final int rowDiff = targetRow - fromRow;
+    final int colDiff = targetCol - fromCol;
+
+    switch (piece.abs()) {
+      case 1:
+        final int direction = piece > 0 ? -1 : 1;
+        return rowDiff == direction &&
+            colDiff.abs() == 1;
+
+      case 2:
+        return (rowDiff.abs() == 2 && colDiff.abs() == 1) ||
+            (rowDiff.abs() == 1 && colDiff.abs() == 2);
+
+      case 3:
+        if (rowDiff.abs() != colDiff.abs()) return false;
+
+        return _pathClearForAttack(
+          board,
+          fromRow,
+          fromCol,
+          targetRow,
+          targetCol,
+        );
+
+      case 4:
+        if (fromRow != targetRow && fromCol != targetCol) {
+          return false;
+        }
+
+        return _pathClearForAttack(
+          board,
+          fromRow,
+          fromCol,
+          targetRow,
+          targetCol,
+        );
+
+      case 5:
+        final bool diagonal =
+            rowDiff.abs() == colDiff.abs();
+
+        final bool straight =
+            fromRow == targetRow ||
+                fromCol == targetCol;
+
+        if (!diagonal && !straight) return false;
+
+        return _pathClearForAttack(
+          board,
+          fromRow,
+          fromCol,
+          targetRow,
+          targetCol,
+        );
+
+      case 6:
+        return rowDiff.abs() <= 1 &&
+            colDiff.abs() <= 1;
+
+      default:
+        return false;
+    }
+  }
+
+  bool _pathClearForAttack(
+      List<int> board,
+      int fromRow,
+      int fromCol,
+      int toRow,
+      int toCol,
+      ) {
+    final int rowStep =
+        (toRow - fromRow).sign;
+
+    final int colStep =
+        (toCol - fromCol).sign;
+
+    int row = fromRow + rowStep;
+    int col = fromCol + colStep;
+
+    while (row != toRow || col != toCol) {
+      if (row < 0 || row > 7 || col < 0 || col > 7) {
+        return false;
+      }
+
+      final int index = row * 8 + col;
+
+      if (board[index] != 0) {
+        return false;
+      }
+
+      row += rowStep;
+      col += colStep;
+    }
+
+    return true;
+  }
+
+  String getPrincipalVariationFromMove(
+      AiGameState state,
+      AiMove bestMove,
+      int maxDepth,
+      ) {
+    final List<String> pv = [];
+
+    AiGameState currentState = state;
+    AiMove? currentMove = bestMove;
+
+    for (int i = 0; i < maxDepth; i++) {
+      if (currentMove == null) break;
+
+      pv.add(
+        "${BoardHelper.indexToCoord(currentMove.fromIndex)}"
+            "${BoardHelper.indexToCoord(currentMove.toIndex)}",
+      );
+
+      currentState = _makeNextState(
+        state: currentState,
+        move: currentMove,
+      );
+
+      final int key = _buildTranspositionKey(
+        state: currentState,
+      );
+
+      final TranspositionEntry? entry =
+      transpositionTable.get(key);
+
+      if (entry == null) break;
+      if (entry.bestFrom == null || entry.bestTo == null) break;
+
+      final int piece =
+      currentState.board[entry.bestFrom!];
+
+      if (piece == 0) break;
+
+      currentMove = AiMove(
+        fromIndex: entry.bestFrom!,
+        toIndex: entry.bestTo!,
+        piece: piece,
+        promotionPiece: entry.bestPromotion,
+        score: entry.score,
+      );
+    }
+
+    return pv.join(" ");
+  }
 }

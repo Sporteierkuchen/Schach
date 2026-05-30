@@ -1263,44 +1263,40 @@ class _SpielBrettState extends State<SpielBrett> {
           canidateMoves.add([newRow, newCol,]);
         }
 
-        bool safeShort = _canCastleSafely(schachfigur, row, col, col + 2);
-
-        bool safeLong = _canCastleSafely(schachfigur, row, col, col - 2);
-
         // kurze Rochade
-        if (schachfigur.isEnemy && schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && safeShort && row == 0 && col == 3) {
+        if (schachfigur.isEnemy && schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && row == 0 && col == 3 && _canCastleSafely(schachfigur, row, col, 1)) {
 
-          canidateMoves.add([0, 1,]);
+          canidateMoves.add([0, 1]);
 
-        } else if (schachfigur.isEnemy && !schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && safeShort && row == 0 && col == 4) {
+        } else if (schachfigur.isEnemy && !schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && row == 0 && col == 4 && _canCastleSafely(schachfigur, row, col, 6)) {
 
-          canidateMoves.add([0, 6,]);
+          canidateMoves.add([0, 6]);
 
-        } else if (!schachfigur.isEnemy && schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && safeShort && row == 7 && col == 4) {
+        } else if (!schachfigur.isEnemy && schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && row == 7 && col == 4 && _canCastleSafely(schachfigur, row, col, 6)) {
 
-          canidateMoves.add([7, 6,]);
+          canidateMoves.add([7, 6]);
 
-        } else if (!schachfigur.isEnemy && !schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && safeShort && row == 7 && col == 3) {
+        } else if (!schachfigur.isEnemy && !schachfigur.istWeiss && isShortCastlePossible(schachfigur, brett) && row == 7 && col == 3 && _canCastleSafely(schachfigur, row, col, 1)) {
 
-          canidateMoves.add([7, 1,]);
+          canidateMoves.add([7, 1]);
         }
 
         // lange Rochade
-        if (schachfigur.isEnemy && schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && safeLong && row == 0 && col == 3) {
+        if (schachfigur.isEnemy && schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && row == 0 && col == 3 && _canCastleSafely(schachfigur, row, col, 5)) {
 
-          canidateMoves.add([0, 5,]);
+          canidateMoves.add([0, 5]);
 
-        } else if (schachfigur.isEnemy && !schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && safeLong && row == 0 && col == 4) {
+        } else if (schachfigur.isEnemy && !schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && row == 0 && col == 4 && _canCastleSafely(schachfigur, row, col, 2)) {
 
-          canidateMoves.add([0, 2,]);
+          canidateMoves.add([0, 2]);
 
-        } else if (!schachfigur.isEnemy && schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && safeLong && row == 7 && col == 4) {
+        } else if (!schachfigur.isEnemy && schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && row == 7 && col == 4 && _canCastleSafely(schachfigur, row, col, 2)) {
 
-          canidateMoves.add([7, 2,]);
+          canidateMoves.add([7, 2]);
 
-        } else if (!schachfigur.isEnemy && !schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && safeLong && row == 7 && col == 3) {
+        } else if (!schachfigur.isEnemy && !schachfigur.istWeiss && isLongCastlePossible(schachfigur, brett) && row == 7 && col == 3 && _canCastleSafely(schachfigur, row, col, 5)) {
 
-          canidateMoves.add([7, 5,]);
+          canidateMoves.add([7, 5]);
         }
 
         break;

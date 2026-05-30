@@ -3,6 +3,10 @@ import 'ai_game_state.dart';
 import 'board_helper.dart';
 
 class MoveGenerator {
+
+  bool debugLegalMoves = false;
+  bool debugCastlingOnly = false;
+
   List<FigurenMovesArray> getAllLegalMoves({
     required AiGameState state,
   }) {
@@ -59,6 +63,20 @@ class MoveGenerator {
 
       if (safe) {
         legalMoves.add(target);
+
+        _logMove(
+          label: "LEGAL",
+          from: index,
+          to: target,
+          piece: piece,
+        );
+      } else {
+        _logMove(
+          label: "ILLEGAL/SIM BLOCKED",
+          from: index,
+          to: target,
+          piece: piece,
+        );
       }
     }
 
@@ -381,19 +399,21 @@ class MoveGenerator {
         : state.castlingRights.blackQueenSide;
 
     if (canKingSide) {
-      final int target = BoardHelper.getIndex(row, col + 2);
+      const int targetCol = 6;
+      final int target = BoardHelper.getIndex(row, targetCol);
 
-      if (_castlePathIsFree(state.board, row, col, col + 2) &&
-          _castlePathIsSafe(state, isWhiteKing, row, col, col + 2)) {
+      if (_castlePathIsFree(state.board, row, col, targetCol) &&
+          _castlePathIsSafe(state, isWhiteKing, row, col, targetCol)) {
         moves.add(target);
       }
     }
 
     if (canQueenSide) {
-      final int target = BoardHelper.getIndex(row, col - 2);
+      const int targetCol = 2;
+      final int target = BoardHelper.getIndex(row, targetCol);
 
-      if (_castlePathIsFree(state.board, row, col, col - 2) &&
-          _castlePathIsSafe(state, isWhiteKing, row, col, col - 2)) {
+      if (_castlePathIsFree(state.board, row, col, targetCol) &&
+          _castlePathIsSafe(state, isWhiteKing, row, col, targetCol)) {
         moves.add(target);
       }
     }
@@ -412,6 +432,10 @@ class MoveGenerator {
     int col = fromCol + step;
 
     while (col != toCol + step) {
+      if (row < 0 || row > 7 || col < 0 || col > 7) {
+        return false;
+      }
+
       final int index = BoardHelper.getIndex(row, col);
 
       if (board[index] != 0) return false;
@@ -431,49 +455,18 @@ class MoveGenerator {
       ) {
     final int step = toCol > fromCol ? 1 : -1;
 
-    int? whiteKingIndexNullable =
-    BoardHelper.getKingIndex(state.board, true);
-
-    int? blackKingIndexNullable =
-    BoardHelper.getKingIndex(state.board, false);
-
-    if (whiteKingIndexNullable == null ||
-        blackKingIndexNullable == null) {
-      return false;
-    }
-
-    int whiteKingIndex = whiteKingIndexNullable;
-    int blackKingIndex = blackKingIndexNullable;
-
     int col = fromCol;
 
     while (col != toCol + step) {
+      final int square = BoardHelper.getIndex(row, col);
 
-      final int kingIndex =
-      BoardHelper.getIndex(row, col);
-
-      final List<int> copy =
-      List<int>.from(state.board);
-
-      copy[BoardHelper.getIndex(row, fromCol)] = 0;
-
-      copy[kingIndex] =
-      isWhiteKing ? 6 : -6;
-
-      if (isWhiteKing) {
-        whiteKingIndex = kingIndex;
-      } else {
-        blackKingIndex = kingIndex;
-      }
-
-      final bool check = isKingInCheck(
-        state: state.copyWith(board: copy),
-        isWhiteKing: isWhiteKing,
-        whiteKingIndex: whiteKingIndex,
-        blackKingIndex: blackKingIndex,
+      final bool attacked = _isSquareAttackedBySide(
+        board: state.board,
+        targetIndex: square,
+        byWhite: !isWhiteKing,
       );
 
-      if (check) {
+      if (attacked) {
         return false;
       }
 
@@ -482,6 +475,109 @@ class MoveGenerator {
 
     return true;
   }
+
+  bool _isSquareAttackedBySide({
+    required List<int> board,
+    required int targetIndex,
+    required bool byWhite,
+  }) {
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece == 0) continue;
+      if ((piece > 0) != byWhite) continue;
+
+      if (_pieceAttacksSquare(
+        board: board,
+        fromIndex: i,
+        piece: piece,
+        targetIndex: targetIndex,
+      )) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool _pieceAttacksSquare({
+    required List<int> board,
+    required int fromIndex,
+    required int piece,
+    required int targetIndex,
+  }) {
+    final int fromRow = BoardHelper.getRow(fromIndex);
+    final int fromCol = BoardHelper.getCol(fromIndex);
+    final int targetRow = BoardHelper.getRow(targetIndex);
+    final int targetCol = BoardHelper.getCol(targetIndex);
+
+    final int rowDiff = targetRow - fromRow;
+    final int colDiff = targetCol - fromCol;
+
+    switch (piece.abs()) {
+      case 1:
+        final int direction = piece > 0 ? -1 : 1;
+        return rowDiff == direction && colDiff.abs() == 1;
+
+      case 2:
+        return (rowDiff.abs() == 2 && colDiff.abs() == 1) ||
+            (rowDiff.abs() == 1 && colDiff.abs() == 2);
+
+      case 3:
+        if (rowDiff.abs() != colDiff.abs()) return false;
+        return _attackPathClear(board, fromRow, fromCol, targetRow, targetCol);
+
+      case 4:
+        if (fromRow != targetRow && fromCol != targetCol) return false;
+        return _attackPathClear(board, fromRow, fromCol, targetRow, targetCol);
+
+      case 5:
+        final bool diagonal = rowDiff.abs() == colDiff.abs();
+        final bool straight = fromRow == targetRow || fromCol == targetCol;
+
+        if (!diagonal && !straight) return false;
+
+        return _attackPathClear(board, fromRow, fromCol, targetRow, targetCol);
+
+      case 6:
+        return rowDiff.abs() <= 1 && colDiff.abs() <= 1;
+
+      default:
+        return false;
+    }
+  }
+
+  bool _attackPathClear(
+      List<int> board,
+      int fromRow,
+      int fromCol,
+      int toRow,
+      int toCol,
+      ) {
+    final int rowStep = (toRow - fromRow).sign;
+    final int colStep = (toCol - fromCol).sign;
+
+    int row = fromRow + rowStep;
+    int col = fromCol + colStep;
+
+    while (row != toRow || col != toCol) {
+      if (row < 0 || row > 7 || col < 0 || col > 7) {
+        return false;
+      }
+
+      final int index = BoardHelper.getIndex(row, col);
+
+      if (board[index] != 0) {
+        return false;
+      }
+
+      row += rowStep;
+      col += colStep;
+    }
+
+    return true;
+  }
+
 
   bool isCheckmate({
     required AiGameState state,
@@ -538,4 +634,48 @@ class MoveGenerator {
 
     return false;
   }
+
+  void _logMove({
+    required String label,
+    required int from,
+    required int to,
+    required int piece,
+  }) {
+    if (!debugLegalMoves) return;
+
+    if (debugCastlingOnly) {
+      final bool isCastle =
+          piece.abs() == 6 &&
+              (BoardHelper.getCol(from) - BoardHelper.getCol(to)).abs() == 2;
+
+      if (!isCastle) return;
+    }
+
+    print(
+      "🧠 KI MoveGen [$label] "
+          "${piece > 0 ? "Weiß" : "Schwarz"} "
+          "${_pieceName(piece)}: "
+          "${BoardHelper.indexToCoord(from)} -> ${BoardHelper.indexToCoord(to)}",
+    );
+  }
+
+  String _pieceName(int piece) {
+    switch (piece.abs()) {
+      case 1:
+        return "Bauer";
+      case 2:
+        return "Springer";
+      case 3:
+        return "Läufer";
+      case 4:
+        return "Turm";
+      case 5:
+        return "Dame";
+      case 6:
+        return "König";
+      default:
+        return "?";
+    }
+  }
+
 }
