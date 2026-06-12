@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:schach/chess_ai/search_heuristics.dart';
-
+import 'package:schach/chess_ai/static_exchange_evaluator.dart';
 import 'ai_game_state.dart';
 import 'ai_move.dart';
 import 'board_evaluator.dart';
@@ -19,11 +19,13 @@ class MinimaxEngine {
 
   static const int infinity = 1000000000;
   static const int mateScore = 900000;
-  static const int quiescenceDepth = 4;
+  static const int quiescenceDepth = 8;
 
   int searchedNodes = 0;
 
   final SearchHeuristics heuristics = SearchHeuristics();
+
+  late final StaticExchangeEvaluator see = StaticExchangeEvaluator(evaluator);
 
   MinimaxEngine({
     required this.moveGenerator,
@@ -120,42 +122,20 @@ class MinimaxEngine {
     required int depth,
     required Stopwatch stopwatch,
     required int timeLimitMs,
+    int alpha = -infinity,
+    int beta = infinity,
   }) {
-
     if (depth == 1) {
       heuristics.clear();
     }
 
     searchedNodes = 0;
 
-    final List<AiMove> legalMoves =
-    _getOrderedMoves(
+    final List<AiMove> legalMoves = _getOrderedMoves(
       state: state,
       hashEntry: null,
       ply: 0,
     );
-
-/*    print("===== ROOT LEGAL MOVES =====");
-
-    for (final AiMove move in legalMoves) {
-      final bool castle =
-          move.piece.abs() == 6 &&
-              (BoardHelper.getCol(move.fromIndex) -
-                  BoardHelper.getCol(move.toIndex))
-                  .abs() ==
-                  2;
-
-      if (castle) {
-        print(
-          "ROOT CASTLE: "
-              "${BoardHelper.indexToCoord(move.fromIndex)}"
-              " -> "
-              "${BoardHelper.indexToCoord(move.toIndex)}",
-        );
-      }
-    }
-
-    print("============================");*/
 
     if (legalMoves.isEmpty) {
       return null;
@@ -164,51 +144,85 @@ class MinimaxEngine {
     int? bestScore;
     AiMove? bestMove;
 
-    int alpha = -infinity;
-    int beta = infinity;
+    int localAlpha = alpha;
+    int localBeta = beta;
+
+    bool completedRootSearch = true;
 
     for (final AiMove move in legalMoves) {
-
       if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
+        completedRootSearch = false;
         break;
       }
 
-      final AiGameState nextState =
-      _makeNextState(
+      final AiGameState nextState = _makeNextState(
         state: state,
         move: move,
       );
 
+      if (moveGenerator.isCheckmate(state: nextState)) {
+        final int mateMoveScore =
+        state.isWhiteTurn ? mateScore - 1 : -mateScore + 1;
+
+        return AiMove(
+          fromIndex: move.fromIndex,
+          toIndex: move.toIndex,
+          piece: move.piece,
+          promotionPiece: move.promotionPiece,
+          score: mateMoveScore,
+        );
+      }
+
       int score = minimaxTimed(
         state: nextState,
         depth: depth - 1,
-        alpha: alpha,
-        beta: beta,
+        alpha: localAlpha,
+        beta: localBeta,
         ply: 1,
         stopwatch: stopwatch,
         timeLimitMs: timeLimitMs,
       );
 
-      score += _rootMoveSafetyAdjustment(
-        beforeState: state,
-        afterState: nextState,
-        move: move,
-      );
+      final bool isMateScore = score.abs() > mateScore - 10000;
+
+      if (!isMateScore) {
+        score += _rootSeeAdjustment(
+          state: state,
+          move: move,
+        );
+
+        score += _rootHangingPiecesAdjustment(
+          beforeState: state,
+          afterState: nextState,
+        );
+
+        score += _rootOpponentThreatAdjustment(
+          afterState: nextState,
+          aiIsWhite: state.isWhiteTurn,
+        );
+
+        score += _rootAttackedPieceEscapeBonus(
+          beforeState: state,
+          afterState: nextState,
+          move: move,
+        );
+
+        score += _rootOpponentMateThreatAdjustment(
+          afterState: nextState,
+          aiIsWhite: state.isWhiteTurn,
+        );
+      }
 
       if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
+        completedRootSearch = false;
         break;
       }
 
       final bool better =
           bestScore == null ||
-              (
-                  state.isWhiteTurn
-                      ? score > bestScore
-                      : score < bestScore
-              );
+              (state.isWhiteTurn ? score > bestScore : score < bestScore);
 
       if (better || bestMove == null) {
-
         bestScore = score;
 
         bestMove = AiMove(
@@ -221,23 +235,12 @@ class MinimaxEngine {
       }
 
       if (state.isWhiteTurn) {
-
-        alpha =
-            max(
-              alpha,
-              bestScore,
-            );
-
+        localAlpha = max(localAlpha, bestScore);
       } else {
-
-        beta =
-            min(
-              beta,
-              bestScore,
-            );
+        localBeta = min(localBeta, bestScore);
       }
 
-      if (alpha >= beta) {
+      if (localAlpha >= localBeta) {
         break;
       }
     }
@@ -248,6 +251,11 @@ class MinimaxEngine {
           "Nodes: $searchedNodes | "
           "Zeit: ${stopwatch.elapsedMilliseconds} ms",
     );
+
+    if (!completedRootSearch) {
+      print("⏱️ Tiefe $depth unvollständig -> Ergebnis wird verworfen");
+      return null;
+    }
 
     if (bestMove != null) {
       final String pv = getPrincipalVariationFromMove(
@@ -520,6 +528,13 @@ class MinimaxEngine {
       return evaluator.evaluate(state.board);
     }
 
+    final bool inCheck = moveGenerator.isKingInCheck(
+      state: state,
+      isWhiteKing: state.isWhiteTurn,
+      whiteKingIndex: whiteKingIndex,
+      blackKingIndex: blackKingIndex,
+    );
+
     if (moveGenerator.isCheckmate(state: state)) {
       return state.isWhiteTurn ? -mateScore + ply : mateScore - ply;
     }
@@ -541,6 +556,41 @@ class MinimaxEngine {
       );
     }
 
+    // Null Move Pruning
+    if (_canApplyNullMovePruning(
+      state: state,
+      depth: depth,
+      inCheck: inCheck,
+    )) {
+      final AiGameState nullMoveState = state.copyWith(
+        isWhiteTurn: !state.isWhiteTurn,
+        isEnemyMove: !state.isEnemyMove,
+        enPassantTargetIndex: null,
+      );
+
+      final int reduction = depth >= 7 ? 3 : 2;
+
+      final int nullMoveScore = minimaxTimed(
+        state: nullMoveState,
+        depth: depth - 1 - reduction,
+        alpha: localAlpha,
+        beta: localBeta,
+        ply: ply + 1,
+        stopwatch: stopwatch,
+        timeLimitMs: timeLimitMs,
+      );
+
+      if (state.isWhiteTurn) {
+        if (nullMoveScore >= localBeta) {
+          return localBeta;
+        }
+      } else {
+        if (nullMoveScore <= localAlpha) {
+          return localAlpha;
+        }
+      }
+    }
+
     final List<AiMove> moves = _getOrderedMoves(
       state: state,
       hashEntry: entry,
@@ -556,7 +606,9 @@ class MinimaxEngine {
     if (state.isWhiteTurn) {
       int bestScore = -infinity;
 
-      for (final AiMove move in moves) {
+      for (int moveIndex = 0; moveIndex < moves.length; moveIndex++) {
+        final AiMove move = moves[moveIndex];
+
         if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
           break;
         }
@@ -566,15 +618,50 @@ class MinimaxEngine {
           move: move,
         );
 
-        final int score = minimaxTimed(
+        int newDepth = depth - 1;
+
+        final bool givesCheck = _moveGivesCheck(
           state: nextState,
-          depth: depth - 1,
+        );
+
+        final bool canReduce = _canApplyLmr(
+          move: move,
+          state: state,
+          depth: depth,
+          moveIndex: moveIndex,
+          inCheck: inCheck,
+          givesCheck: givesCheck,
+        );
+
+        if (canReduce && !givesCheck) {
+          newDepth = depth - 2;
+        }
+
+        if (givesCheck) {
+          newDepth += 1;
+        }
+
+        int score = minimaxTimed(
+          state: nextState,
+          depth: newDepth,
           alpha: localAlpha,
           beta: localBeta,
           ply: ply + 1,
           stopwatch: stopwatch,
           timeLimitMs: timeLimitMs,
         );
+
+        if (canReduce && score > localAlpha) {
+          score = minimaxTimed(
+            state: nextState,
+            depth: givesCheck ? newDepth : depth - 1,
+            alpha: localAlpha,
+            beta: localBeta,
+            ply: ply + 1,
+            stopwatch: stopwatch,
+            timeLimitMs: timeLimitMs,
+          );
+        }
 
         if (score > bestScore) {
           bestScore = score;
@@ -606,7 +693,9 @@ class MinimaxEngine {
     } else {
       int bestScore = infinity;
 
-      for (final AiMove move in moves) {
+      for (int moveIndex = 0; moveIndex < moves.length; moveIndex++) {
+        final AiMove move = moves[moveIndex];
+
         if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
           break;
         }
@@ -616,15 +705,50 @@ class MinimaxEngine {
           move: move,
         );
 
-        final int score = minimaxTimed(
+        int newDepth = depth - 1;
+
+        final bool givesCheck = _moveGivesCheck(
           state: nextState,
-          depth: depth - 1,
+        );
+
+        final bool canReduce = _canApplyLmr(
+          move: move,
+          state: state,
+          depth: depth,
+          moveIndex: moveIndex,
+          inCheck: inCheck,
+          givesCheck: givesCheck,
+        );
+
+        if (canReduce && !givesCheck) {
+          newDepth = depth - 2;
+        }
+
+        if (givesCheck) {
+          newDepth += 1;
+        }
+
+        int score = minimaxTimed(
+          state: nextState,
+          depth: newDepth,
           alpha: localAlpha,
           beta: localBeta,
           ply: ply + 1,
           stopwatch: stopwatch,
           timeLimitMs: timeLimitMs,
         );
+
+        if (canReduce && score < localBeta) {
+          score = minimaxTimed(
+            state: nextState,
+            depth: givesCheck ? newDepth : depth - 1,
+            alpha: localAlpha,
+            beta: localBeta,
+            ply: ply + 1,
+            stopwatch: stopwatch,
+            timeLimitMs: timeLimitMs,
+          );
+        }
 
         if (score < bestScore) {
           bestScore = score;
@@ -656,24 +780,22 @@ class MinimaxEngine {
     }
   }
 
-
   int quiescence({
     required AiGameState state,
     required int alpha,
     required int beta,
     required int depth,
   }) {
-
     searchedNodes++;
+
+    final bool allowChecks = depth >= quiescenceDepth - 3;
 
     int localAlpha = alpha;
     int localBeta = beta;
 
-    final int standPat =
-    evaluator.evaluate(state.board);
+    final int standPat = evaluator.evaluate(state.board);
 
     if (state.isWhiteTurn) {
-
       if (standPat >= localBeta) {
         return localBeta;
       }
@@ -681,9 +803,7 @@ class MinimaxEngine {
       if (standPat > localAlpha) {
         localAlpha = standPat;
       }
-
     } else {
-
       if (standPat <= localAlpha) {
         return localAlpha;
       }
@@ -697,37 +817,76 @@ class MinimaxEngine {
       return standPat;
     }
 
-    final List<AiMove> captures =
-    _getOrderedMoves(
+    final List<_QuiescenceCandidate> candidates = [];
+
+    final List<AiMove> orderedMoves = _getOrderedMoves(
       state: state,
       hashEntry: null,
       ply: 0,
-    ).where((AiMove move) {
+    );
 
-      return state.board[
-      move.toIndex
-      ] != 0 ||
-          move.promotionPiece != null;
+    for (final AiMove move in orderedMoves) {
+      final bool isCapture = state.board[move.toIndex] != 0;
+      final bool isPromotion = move.promotionPiece != null;
 
-    }).toList();
+      AiGameState? nextState;
 
-    for (final AiMove move in captures) {
+      bool givesCheck = false;
 
-      final AiGameState nextState =
-      _makeNextState(
+      if (!isCapture && !isPromotion) {
+        if (!allowChecks) {
+          continue;
+        }
+
+        nextState = _makeNextState(
+          state: state,
+          move: move,
+        );
+
+        givesCheck = _moveGivesCheck(
+          state: nextState,
+        );
+
+        if (!givesCheck) {
+          continue;
+        }
+      }
+
+      if (isCapture) {
+        final int seeScore = see.evaluateCapture(
+          board: state.board,
+          from: move.fromIndex,
+          to: move.toIndex,
+          movingPiece: move.piece,
+        );
+
+        if (seeScore < 0) {
+          continue;
+        }
+      }
+
+      nextState ??= _makeNextState(
         state: state,
         move: move,
       );
 
+      candidates.add(
+        _QuiescenceCandidate(
+          move: move,
+          nextState: nextState,
+        ),
+      );
+    }
+
+    for (final _QuiescenceCandidate candidate in candidates) {
       final int score = quiescence(
-        state: nextState,
+        state: candidate.nextState,
         alpha: localAlpha,
         beta: localBeta,
         depth: depth - 1,
       );
 
       if (state.isWhiteTurn) {
-
         if (score > localAlpha) {
           localAlpha = score;
         }
@@ -735,9 +894,7 @@ class MinimaxEngine {
         if (localAlpha >= localBeta) {
           return localBeta;
         }
-
       } else {
-
         if (score < localBeta) {
           localBeta = score;
         }
@@ -748,9 +905,7 @@ class MinimaxEngine {
       }
     }
 
-    return state.isWhiteTurn
-        ? localAlpha
-        : localBeta;
+    return state.isWhiteTurn ? localAlpha : localBeta;
   }
 
   List<AiMove> _getOrderedMoves({
@@ -1000,81 +1155,320 @@ class MinimaxEngine {
     );
   }
 
+  int _rootSeeAdjustment({
+    required AiGameState state,
+    required AiMove move,
+  }) {
+    final int captured = state.board[move.toIndex];
 
-  int _rootMoveSafetyAdjustment({
+    // Nur echte Schlagzüge bewerten
+    if (captured == 0) {
+      return 0;
+    }
+
+    final int seeScore = see.evaluateCapture(
+      board: state.board,
+      from: move.fromIndex,
+      to: move.toIndex,
+      movingPiece: move.piece,
+    );
+
+    final bool badCapture = see.isBadCapture(
+      board: state.board,
+      from: move.fromIndex,
+      to: move.toIndex,
+      movingPiece: move.piece,
+    );
+
+    int adjustment = seeScore * 6;
+
+    if (badCapture) {
+      adjustment -= 3000;
+    }
+
+    return state.isWhiteTurn ? adjustment : -adjustment;
+  }
+
+  int _rootOpponentThreatAdjustment({
+    required AiGameState afterState,
+    required bool aiIsWhite,
+  }) {
+    final List<AiMove> opponentMoves = _getOrderedMoves(
+      state: afterState,
+      hashEntry: null,
+      ply: 1,
+    );
+
+    int worstLoss = 0;
+
+    for (final AiMove opponentMove in opponentMoves) {
+      final int captured = afterState.board[opponentMove.toIndex];
+
+      if (captured == 0) {
+        continue;
+      }
+
+      if ((captured > 0) != aiIsWhite) {
+        continue;
+      }
+
+      final int victimValue = evaluator.pieceValue(captured).abs();
+      final int attackerValue = evaluator.pieceValue(opponentMove.piece).abs();
+
+      final int seeScore = see.evaluateCapture(
+        board: afterState.board,
+        from: opponentMove.fromIndex,
+        to: opponentMove.toIndex,
+        movingPiece: opponentMove.piece,
+      );
+
+      int loss = victimValue;
+
+      if (attackerValue < victimValue) {
+        loss += victimValue - attackerValue;
+      }
+
+      if (seeScore > 0) {
+        loss += seeScore;
+      }
+
+      if (loss > worstLoss) {
+        worstLoss = loss;
+      }
+    }
+
+    if (worstLoss == 0) {
+      return 0;
+    }
+
+    final int penalty = worstLoss * 2;
+
+    return aiIsWhite ? -penalty : penalty;
+  }
+
+  int _rootAttackedPieceEscapeBonus({
     required AiGameState beforeState,
     required AiGameState afterState,
     required AiMove move,
   }) {
-    final int movedPiece =
-    afterState.board[move.toIndex];
+    final bool aiIsWhite = beforeState.isWhiteTurn;
 
-    if (movedPiece == 0) {
+    final int movedPiece = move.piece.abs();
+
+    if (movedPiece == 1 || movedPiece == 6) {
       return 0;
     }
 
-    if (movedPiece.abs() == 6) {
-      return 0;
-    }
-
-    final int pieceValue =
-    evaluator.pieceValue(movedPiece).abs();
-
-    final bool movedPieceIsWhite =
-        movedPiece > 0;
-
-    final bool attacked =
-    _isSquareAttackedBySide(
-      afterState.board,
-      move.toIndex,
-      byWhite: !movedPieceIsWhite,
+    final bool wasAttacked = see.isSquareAttackedBySide(
+      beforeState.board,
+      move.fromIndex,
+      byWhite: !aiIsWhite,
     );
 
-    if (!attacked) {
+    if (!wasAttacked) {
       return 0;
     }
 
-    final bool defended =
-    _isSquareAttackedBySide(
+    final bool stillExistsOnTarget =
+        afterState.board[move.toIndex].abs() == movedPiece &&
+            (afterState.board[move.toIndex] > 0) == aiIsWhite;
+
+    if (!stillExistsOnTarget) {
+      return 0;
+    }
+
+    final bool stillAttacked = see.isSquareAttackedBySide(
       afterState.board,
       move.toIndex,
-      byWhite: movedPieceIsWhite,
+      byWhite: !aiIsWhite,
     );
 
+    final int value = evaluator.pieceValue(move.piece).abs();
+
+    if (!stillAttacked) {
+      return aiIsWhite ? value : -value;
+    }
+
+    return aiIsWhite ? -(value ~/ 2) : (value ~/ 2);
+  }
+
+  int _rootOpponentMateThreatAdjustment({
+    required AiGameState afterState,
+    required bool aiIsWhite,
+  }) {
+    final List<AiMove> opponentMoves = _getOrderedMoves(
+      state: afterState,
+      hashEntry: null,
+      ply: 1,
+    );
+
+    for (final AiMove opponentMove in opponentMoves) {
+      final AiGameState replyState = _makeNextState(
+        state: afterState,
+        move: opponentMove,
+      );
+
+      if (moveGenerator.isCheckmate(state: replyState)) {
+        return aiIsWhite ? -mateScore ~/ 2 : mateScore ~/ 2;
+      }
+    }
+
+    return 0;
+  }
+
+
+  int _rootHangingPiecesAdjustment({
+    required AiGameState beforeState,
+    required AiGameState afterState,
+  }) {
     int penalty = 0;
 
-    if (!defended) {
-      penalty = pieceValue ~/ 2;
-    } else {
-      penalty = pieceValue ~/ 5;
+    final bool aiIsWhite = beforeState.isWhiteTurn;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = afterState.board[i];
+
+      if (piece == 0) continue;
+      if ((piece > 0) != aiIsWhite) continue;
+      if (piece.abs() == 1 || piece.abs() == 6) continue;
+
+      final bool attacked = see.isSquareAttackedBySide(
+        afterState.board,
+        i,
+        byWhite: !aiIsWhite,
+      );
+
+      if (!attacked) continue;
+
+      final bool defended = see.isSquareAttackedBySide(
+        afterState.board,
+        i,
+        byWhite: aiIsWhite,
+      );
+
+      final int value = evaluator.pieceValue(piece).abs();
+
+      if (!defended) {
+        penalty += value * 2;
+      } else {
+        penalty += value ~/ 2;
+      }
+
+    }
+
+    if (penalty == 0) {
+      return 0;
+    }
+
+    return aiIsWhite ? -penalty : penalty;
+  }
+
+  bool _canApplyLmr({
+    required AiMove move,
+    required AiGameState state,
+    required int depth,
+    required int moveIndex,
+    required bool inCheck,
+    required bool givesCheck,
+  }) {
+    if (depth < 4) {
+      return false;
+    }
+
+    if (moveIndex < 6) {
+      return false;
+    }
+
+    if (inCheck) {
+      return false;
+    }
+
+    // Schachzüge niemals reduzieren
+    if (givesCheck) {
+      return false;
+    }
+
+    final bool isCapture = state.board[move.toIndex] != 0;
+
+    if (isCapture) {
+      return false;
     }
 
     if (move.promotionPiece != null) {
-      penalty ~/= 2;
+      return false;
     }
 
-    return movedPieceIsWhite
-        ? -penalty
-        : penalty;
+    if (move.piece.abs() == 6) {
+      return false;
+    }
+
+    return true;
   }
 
-  bool _isSquareAttackedBySide(
-      List<int> board,
-      int targetIndex, {
-        required bool byWhite,
-      }) {
-    for (int i = 0; i < 64; i++) {
-      final int piece = board[i];
+  bool _canApplyNullMovePruning({
+    required AiGameState state,
+    required int depth,
+    required bool inCheck,
+  }) {
+    if (depth < 4) {
+      return false;
+    }
 
+    if (inCheck) {
+      return false;
+    }
+
+    if (_isEndgameForNullMove(state.board)) {
+      return false;
+    }
+
+    if (!_sideHasNonPawnMaterial(
+      board: state.board,
+      white: state.isWhiteTurn,
+    )) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool _isEndgameForNullMove(List<int> board) {
+    int material = 0;
+
+    for (final int piece in board) {
+      switch (piece.abs()) {
+        case 2:
+          material += 320;
+          break;
+        case 3:
+          material += 330;
+          break;
+        case 4:
+          material += 500;
+          break;
+        case 5:
+          material += 900;
+          break;
+      }
+    }
+
+    return material <= 1400;
+  }
+
+  bool _sideHasNonPawnMaterial({
+    required List<int> board,
+    required bool white,
+  }) {
+    for (final int piece in board) {
       if (piece == 0) continue;
-      if ((piece > 0) != byWhite) continue;
+      if ((piece > 0) != white) continue;
 
-      if (_pieceControlsSquare(
-        board,
-        i,
-        piece,
-        targetIndex,
-      )) {
+      final int absPiece = piece.abs();
+
+      if (absPiece == 2 ||
+          absPiece == 3 ||
+          absPiece == 4 ||
+          absPiece == 5) {
         return true;
       }
     }
@@ -1082,114 +1476,26 @@ class MinimaxEngine {
     return false;
   }
 
-  bool _pieceControlsSquare(
-      List<int> board,
-      int fromIndex,
-      int piece,
-      int targetIndex,
-      ) {
-    final int fromRow = fromIndex ~/ 8;
-    final int fromCol = fromIndex % 8;
+  bool _moveGivesCheck({
+    required AiGameState state,
+  }) {
+    final int? whiteKingIndex =
+    BoardHelper.getKingIndex(state.board, true);
 
-    final int targetRow = targetIndex ~/ 8;
-    final int targetCol = targetIndex % 8;
+    final int? blackKingIndex =
+    BoardHelper.getKingIndex(state.board, false);
 
-    final int rowDiff = targetRow - fromRow;
-    final int colDiff = targetCol - fromCol;
-
-    switch (piece.abs()) {
-      case 1:
-        final int direction = piece > 0 ? -1 : 1;
-        return rowDiff == direction &&
-            colDiff.abs() == 1;
-
-      case 2:
-        return (rowDiff.abs() == 2 && colDiff.abs() == 1) ||
-            (rowDiff.abs() == 1 && colDiff.abs() == 2);
-
-      case 3:
-        if (rowDiff.abs() != colDiff.abs()) return false;
-
-        return _pathClearForAttack(
-          board,
-          fromRow,
-          fromCol,
-          targetRow,
-          targetCol,
-        );
-
-      case 4:
-        if (fromRow != targetRow && fromCol != targetCol) {
-          return false;
-        }
-
-        return _pathClearForAttack(
-          board,
-          fromRow,
-          fromCol,
-          targetRow,
-          targetCol,
-        );
-
-      case 5:
-        final bool diagonal =
-            rowDiff.abs() == colDiff.abs();
-
-        final bool straight =
-            fromRow == targetRow ||
-                fromCol == targetCol;
-
-        if (!diagonal && !straight) return false;
-
-        return _pathClearForAttack(
-          board,
-          fromRow,
-          fromCol,
-          targetRow,
-          targetCol,
-        );
-
-      case 6:
-        return rowDiff.abs() <= 1 &&
-            colDiff.abs() <= 1;
-
-      default:
-        return false;
-    }
-  }
-
-  bool _pathClearForAttack(
-      List<int> board,
-      int fromRow,
-      int fromCol,
-      int toRow,
-      int toCol,
-      ) {
-    final int rowStep =
-        (toRow - fromRow).sign;
-
-    final int colStep =
-        (toCol - fromCol).sign;
-
-    int row = fromRow + rowStep;
-    int col = fromCol + colStep;
-
-    while (row != toRow || col != toCol) {
-      if (row < 0 || row > 7 || col < 0 || col > 7) {
-        return false;
-      }
-
-      final int index = row * 8 + col;
-
-      if (board[index] != 0) {
-        return false;
-      }
-
-      row += rowStep;
-      col += colStep;
+    if (whiteKingIndex == null ||
+        blackKingIndex == null) {
+      return false;
     }
 
-    return true;
+    return moveGenerator.isKingInCheck(
+      state: state,
+      isWhiteKing: state.isWhiteTurn,
+      whiteKingIndex: whiteKingIndex,
+      blackKingIndex: blackKingIndex,
+    );
   }
 
   String getPrincipalVariationFromMove(
@@ -1241,4 +1547,16 @@ class MinimaxEngine {
 
     return pv.join(" ");
   }
+
+}
+
+
+class _QuiescenceCandidate {
+  final AiMove move;
+  final AiGameState nextState;
+
+  const _QuiescenceCandidate({
+    required this.move,
+    required this.nextState,
+  });
 }

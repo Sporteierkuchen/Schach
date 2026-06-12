@@ -3,11 +3,15 @@ import 'package:schach/chess_ai/search_heuristics.dart';
 import '../components/FigurenMovesArray.dart';
 import 'ai_move.dart';
 import 'board_evaluator.dart';
+import 'static_exchange_evaluator.dart';
 
 class MoveOrdering {
   final BoardEvaluator evaluator;
+  late final StaticExchangeEvaluator see;
 
-  MoveOrdering(this.evaluator);
+  MoveOrdering(this.evaluator) {
+    see = StaticExchangeEvaluator(evaluator);
+  }
 
   List<AiMove> flattenAndOrderMoves(
       List<FigurenMovesArray> groupedMoves,
@@ -102,6 +106,7 @@ class MoveOrdering {
       ) {
     int score = 0;
 
+    // 1. Hash-Move aus Transposition Table immer zuerst prüfen
     if (hashFrom == from && hashTo == to && hashPromotion == promotionPiece) {
       score += 1000000;
     }
@@ -114,45 +119,64 @@ class MoveOrdering {
       score: 0,
     );
 
+    // 2. Killer Moves
     if (heuristics != null && heuristics.isKillerMove(tempMove, ply)) {
       score += 500000;
     }
 
+    // 3. History Heuristic
     if (heuristics != null) {
       score += heuristics.getHistoryScore(tempMove);
     }
 
     final int captured = board[to];
 
+    // 4. Schlagzüge mit SEE bewerten
     if (captured != 0) {
       final int victimValue = evaluator.pieceValue(captured).abs();
       final int attackerValue = evaluator.pieceValue(piece).abs();
 
+      // MVV-LVA: wertvolle Figur schlagen, billige Figur bevorzugen
       score += victimValue * 10 - attackerValue;
 
-      final bool targetIsDefended =
-      _isSquareDefendedByOpponent(
-        board,
-        to,
-        piece > 0,
+      final int seeScore = see.evaluateCapture(
+        board: board,
+        from: from,
+        to: to,
+        movingPiece: piece,
       );
 
-      if (targetIsDefended) {
-        final int exchangeLoss =
-            attackerValue - victimValue;
+      // Guter Tausch wird stark bevorzugt
+      score += seeScore * 8;
 
-        if (exchangeLoss > 0) {
-          score -= exchangeLoss * 12;
-        } else {
-          score += 30;
-        }
+      final bool badCapture = see.isBadCapture(
+        board: board,
+        from: from,
+        to: to,
+        movingPiece: piece,
+      );
+
+      // Schlechter Tausch sehr weit nach hinten
+      if (badCapture) {
+        score -= 8000;
+      }
+
+      // Kleine Figur schlägt große/gleichwertige Figur
+      if (attackerValue <= victimValue) {
+        score += 300;
       }
     }
 
+    // 5. Promotionen bevorzugen
     if (promotionPiece != null) {
       score += evaluator.pieceValue(promotionPiece).abs();
+
+      if (promotionPiece.abs() == 5) {
+        score += 500;
+      }
     }
 
+    // 6. Zentrum leicht bevorzugen
     final int toRow = to ~/ 8;
     final int toCol = to % 8;
 
@@ -162,135 +186,4 @@ class MoveOrdering {
 
     return score;
   }
-
-  bool _isSquareDefendedByOpponent(
-      List<int> board,
-      int targetIndex,
-      bool movingPieceIsWhite,
-      ) {
-    for (int i = 0; i < 64; i++) {
-      final int piece = board[i];
-
-      if (piece == 0) continue;
-
-      final bool pieceIsWhite = piece > 0;
-
-      if (pieceIsWhite == movingPieceIsWhite) {
-        continue;
-      }
-
-      if (_pieceControlsSquare(
-        board,
-        i,
-        piece,
-        targetIndex,
-      )) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  bool _pieceControlsSquare(
-      List<int> board,
-      int fromIndex,
-      int piece,
-      int targetIndex,
-      ) {
-    final int fromRow = fromIndex ~/ 8;
-    final int fromCol = fromIndex % 8;
-
-    final int targetRow = targetIndex ~/ 8;
-    final int targetCol = targetIndex % 8;
-
-    final int rowDiff = targetRow - fromRow;
-    final int colDiff = targetCol - fromCol;
-
-    switch (piece.abs()) {
-      case 1:
-        final int direction = piece > 0 ? -1 : 1;
-        return rowDiff == direction && colDiff.abs() == 1;
-
-      case 2:
-        return (rowDiff.abs() == 2 && colDiff.abs() == 1) ||
-            (rowDiff.abs() == 1 && colDiff.abs() == 2);
-
-      case 3:
-        if (rowDiff.abs() != colDiff.abs()) return false;
-        return _pathClear(
-          board,
-          fromRow,
-          fromCol,
-          targetRow,
-          targetCol,
-        );
-
-      case 4:
-        if (fromRow != targetRow && fromCol != targetCol) return false;
-        return _pathClear(
-          board,
-          fromRow,
-          fromCol,
-          targetRow,
-          targetCol,
-        );
-
-      case 5:
-        final bool diagonal =
-            rowDiff.abs() == colDiff.abs();
-
-        final bool straight =
-            fromRow == targetRow ||
-                fromCol == targetCol;
-
-        if (!diagonal && !straight) return false;
-
-        return _pathClear(
-          board,
-          fromRow,
-          fromCol,
-          targetRow,
-          targetCol,
-        );
-
-      case 6:
-        return rowDiff.abs() <= 1 &&
-            colDiff.abs() <= 1;
-
-      default:
-        return false;
-    }
-  }
-
-  bool _pathClear(
-      List<int> board,
-      int fromRow,
-      int fromCol,
-      int toRow,
-      int toCol,
-      ) {
-    final int rowStep =
-        (toRow - fromRow).sign;
-
-    final int colStep =
-        (toCol - fromCol).sign;
-
-    int row = fromRow + rowStep;
-    int col = fromCol + colStep;
-
-    while (row != toRow || col != toCol) {
-      final int index = row * 8 + col;
-
-      if (board[index] != 0) {
-        return false;
-      }
-
-      row += rowStep;
-      col += colStep;
-    }
-
-    return true;
-  }
-
 }

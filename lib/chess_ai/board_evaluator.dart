@@ -6,8 +6,6 @@ class BoardEvaluator {
   int evaluate(List<int> board) {
     int score = 0;
 
-    //debugValidateTables();
-
     final bool endgame = _isEndgame(board);
 
     for (int i = 0; i < 64; i++) {
@@ -21,7 +19,11 @@ class BoardEvaluator {
 
     score += pawnStructureScore(board);
     score += kingSafetyScore(board, endgame);
-    //score += hangingPieceScore(board);
+    score += hangingPieceScore(board);
+    score += developmentScore(board, endgame);
+    score += rookFileScore(board);
+    score += bishopPairScore(board);
+    score += queenActivityScore(board, endgame);
 
     return score;
   }
@@ -242,6 +244,114 @@ class BoardEvaluator {
     }
 
     return true;
+  }
+
+  int developmentScore(List<int> board, bool endgame) {
+    if (endgame) return 0;
+
+    int score = 0;
+
+    // Weiße Leichtfiguren noch auf Startfeldern
+    if (board[57] == 2) score -= 25; // Sb1
+    if (board[62] == 2) score -= 25; // Sg1
+    if (board[58] == 3) score -= 20; // Lc1
+    if (board[61] == 3) score -= 20; // Lf1
+
+    // Schwarze Leichtfiguren noch auf Startfeldern
+    if (board[1] == -2) score += 25; // Sb8
+    if (board[6] == -2) score += 25; // Sg8
+    if (board[2] == -3) score += 20; // Lc8
+    if (board[5] == -3) score += 20; // Lf8
+
+    // König in der Mitte im Mittelspiel bestrafen
+    if (board[60] == 6) score -= 35;
+    if (board[4] == -6) score += 35;
+
+    return score;
+  }
+
+  int queenActivityScore(List<int> board, bool endgame) {
+    if (endgame) return 0;
+
+    int score = 0;
+
+    final int whiteQueen = board.indexOf(5);
+    final int blackQueen = board.indexOf(-5);
+
+    if (whiteQueen != -1) {
+      final int row = BoardHelper.getRow(whiteQueen);
+
+      // Weiße Dame zu früh weit draußen
+      if (row < 5) score -= 25;
+    }
+
+    if (blackQueen != -1) {
+      final int row = BoardHelper.getRow(blackQueen);
+
+      // Schwarze Dame zu früh weit draußen
+      if (row > 2) score += 25;
+    }
+
+    return score;
+  }
+
+  int bishopPairScore(List<int> board) {
+    int whiteBishops = 0;
+    int blackBishops = 0;
+
+    for (final int piece in board) {
+      if (piece == 3) whiteBishops++;
+      if (piece == -3) blackBishops++;
+    }
+
+    int score = 0;
+
+    if (whiteBishops >= 2) score += 35;
+    if (blackBishops >= 2) score -= 35;
+
+    return score;
+  }
+
+  int rookFileScore(List<int> board) {
+    int score = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece.abs() != 4) continue;
+
+      final bool white = piece > 0;
+      final int file = BoardHelper.getCol(i);
+
+      bool ownPawnOnFile = false;
+      bool enemyPawnOnFile = false;
+
+      for (int row = 0; row < 8; row++) {
+        final int p = board[BoardHelper.getIndex(row, file)];
+
+        if (p == 0) continue;
+
+        if (p.abs() == 1) {
+          if ((p > 0) == white) {
+            ownPawnOnFile = true;
+          } else {
+            enemyPawnOnFile = true;
+          }
+        }
+      }
+
+      int bonus = 0;
+
+      if (!ownPawnOnFile && !enemyPawnOnFile) {
+        bonus = 25; // offene Linie
+      } else if (!ownPawnOnFile && enemyPawnOnFile) {
+        bonus = 15; // halboffene Linie
+      }
+
+      score += white ? bonus : -bonus;
+    }
+
+    return score;
   }
 
   int positionalBonus(

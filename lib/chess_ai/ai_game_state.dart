@@ -59,7 +59,7 @@ class AiGameState {
     AiCastlingRights? castlingRights,
   }) {
     return AiGameState(
-      board: board ?? List<int>.from(this.board),
+      board: board ?? this.board,
       isEnemyMove: isEnemyMove ?? this.isEnemyMove,
       isWhiteTurn: isWhiteTurn ?? this.isWhiteTurn,
       playerIsWhite: playerIsWhite ?? this.playerIsWhite,

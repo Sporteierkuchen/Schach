@@ -23,6 +23,8 @@ class TranspositionEntry {
 }
 
 class TranspositionTable {
+  static const int maxEntries = 300000;
+
   final Map<int, TranspositionEntry> _table = {};
 
   TranspositionEntry? get(int key) {
@@ -38,6 +40,10 @@ class TranspositionTable {
     int? bestTo,
     int? bestPromotion,
   }) {
+    if (_table.length > maxEntries) {
+      _table.clear();
+    }
+
     final TranspositionEntry? old = _table[key];
 
     if (old != null && old.depth > depth) {
