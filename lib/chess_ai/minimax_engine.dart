@@ -35,89 +35,6 @@ class MinimaxEngine {
     required this.transpositionTable,
   });
 
-  AiMove? findBestMove({
-    required AiGameState state,
-    required int depth,
-  }) {
-    searchedNodes = 0;
-
-    final List<AiMove> legalMoves = _getOrderedMoves(
-      state: state,
-      hashEntry: null,
-      ply: 0,
-    );
-
-    if (legalMoves.isEmpty) {
-      return null;
-    }
-
-    int bestScore = state.isWhiteTurn ? -infinity : infinity;
-    final List<AiMove> bestMoves = [];
-
-    int alpha = -infinity;
-    int beta = infinity;
-
-    for (final AiMove move in legalMoves) {
-      final AiGameState nextState = _makeNextState(
-        state: state,
-        move: move,
-      );
-
-      final int score = minimax(
-        state: nextState,
-        depth: depth - 1,
-        alpha: alpha,
-        beta: beta,
-        ply: 1,
-      );
-
-      final AiMove scoredMove = AiMove(
-        fromIndex: move.fromIndex,
-        toIndex: move.toIndex,
-        piece: move.piece,
-        promotionPiece: move.promotionPiece,
-        score: score,
-      );
-
-      final bool better =
-      state.isWhiteTurn
-          ? score > bestScore
-          : score < bestScore;
-
-      if (better) {
-        bestScore = score;
-
-        bestMoves
-          ..clear()
-          ..add(scoredMove);
-
-      } else if (score == bestScore) {
-        bestMoves.add(scoredMove);
-      }
-
-      if (state.isWhiteTurn) {
-        alpha = max(alpha, bestScore);
-      } else {
-        beta = min(beta, bestScore);
-      }
-    }
-
-    final AiMove selected =
-    bestMoves[
-    Random().nextInt(bestMoves.length)
-    ];
-
-    print(
-      "⭐ Beste Bewertung Tiefe $depth: "
-          "$bestScore | "
-          "Kandidaten: ${bestMoves.length} | "
-          "Nodes: $searchedNodes | "
-          "TT: ${transpositionTable.size}",
-    );
-
-    return selected;
-  }
-
   AiMove? findBestMoveTimed({
     required AiGameState state,
     required int depth,
@@ -150,20 +67,29 @@ class MinimaxEngine {
 
     bool completedRootSearch = true;
 
+    final bool aiIsWhite = state.isWhiteTurn;
+
     for (final AiMove move in legalMoves) {
       if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
         completedRootSearch = false;
         break;
       }
 
-      final AiGameState nextState = _makeNextState(
+      final List<int> beforeBoard = List<int>.from(state.board);
+
+      final MoveUndo undo = _makeMoveInPlace(
         state: state,
         move: move,
       );
 
-      if (moveGenerator.isCheckmate(state: nextState)) {
+      if (moveGenerator.isCheckmate(state: state)) {
+        _undoMoveInPlace(
+          state: state,
+          undo: undo,
+        );
+
         final int mateMoveScore =
-        state.isWhiteTurn ? mateScore - 1 : -mateScore + 1;
+        aiIsWhite ? mateScore - 1 : -mateScore + 1;
 
         return AiMove(
           fromIndex: move.fromIndex,
@@ -175,7 +101,7 @@ class MinimaxEngine {
       }
 
       int score = minimaxTimed(
-        state: nextState,
+        state: state,
         depth: depth - 1,
         alpha: localAlpha,
         beta: localBeta,
@@ -188,31 +114,38 @@ class MinimaxEngine {
 
       if (!isMateScore) {
         score += _rootSeeAdjustment(
-          state: state,
+          beforeBoard: beforeBoard,
           move: move,
+          aiIsWhite: aiIsWhite,
         );
 
         score += _rootHangingPiecesAdjustment(
-          beforeState: state,
-          afterState: nextState,
+          afterState: state,
+          aiIsWhite: aiIsWhite,
         );
 
         score += _rootOpponentThreatAdjustment(
-          afterState: nextState,
-          aiIsWhite: state.isWhiteTurn,
+          afterState: state,
+          aiIsWhite: aiIsWhite,
         );
 
         score += _rootAttackedPieceEscapeBonus(
-          beforeState: state,
-          afterState: nextState,
+          beforeBoard: beforeBoard,
+          afterBoard: state.board,
           move: move,
+          aiIsWhite: aiIsWhite,
         );
 
         score += _rootOpponentMateThreatAdjustment(
-          afterState: nextState,
-          aiIsWhite: state.isWhiteTurn,
+          afterState: state,
+          aiIsWhite: aiIsWhite,
         );
       }
+
+      _undoMoveInPlace(
+        state: state,
+        undo: undo,
+      );
 
       if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
         completedRootSearch = false;
@@ -221,7 +154,7 @@ class MinimaxEngine {
 
       final bool better =
           bestScore == null ||
-              (state.isWhiteTurn ? score > bestScore : score < bestScore);
+              (aiIsWhite ? score > bestScore : score < bestScore);
 
       if (better || bestMove == null) {
         bestScore = score;
@@ -235,7 +168,7 @@ class MinimaxEngine {
         );
       }
 
-      if (state.isWhiteTurn) {
+      if (aiIsWhite) {
         localAlpha = max(localAlpha, bestScore);
       } else {
         localBeta = min(localBeta, bestScore);
@@ -269,216 +202,6 @@ class MinimaxEngine {
     }
 
     return bestMove;
-  }
-
-  int minimax({
-    required AiGameState state,
-    required int depth,
-    required int alpha,
-    required int beta,
-    required int ply,
-  }) {
-
-    searchedNodes++;
-
-    final int key =
-    _buildTranspositionKey(
-      state: state,
-    );
-
-    final int originalAlpha = alpha;
-    final int originalBeta = beta;
-
-    int localAlpha = alpha;
-    int localBeta = beta;
-
-    final TranspositionEntry? entry =
-    transpositionTable.get(key);
-
-    if (entry != null &&
-        entry.depth >= depth) {
-
-      if (entry.flag ==
-          TranspositionFlag.exact) {
-
-        return entry.score;
-      }
-
-      if (entry.flag ==
-          TranspositionFlag.lowerBound) {
-
-        localAlpha =
-            max(localAlpha, entry.score);
-
-      } else if (entry.flag ==
-          TranspositionFlag.upperBound) {
-
-        localBeta =
-            min(localBeta, entry.score);
-      }
-
-      if (localAlpha >= localBeta) {
-        return entry.score;
-      }
-    }
-
-    final int? whiteKingIndex =
-    BoardHelper.getKingIndex(
-      state.board,
-      true,
-    );
-
-    final int? blackKingIndex =
-    BoardHelper.getKingIndex(
-      state.board,
-      false,
-    );
-
-    if (whiteKingIndex == null ||
-        blackKingIndex == null) {
-
-      return evaluator.evaluate(
-        state.board,
-      );
-    }
-
-    if (moveGenerator.isCheckmate(
-      state: state,
-    )) {
-
-      if (state.isWhiteTurn) {
-        return -mateScore + ply;
-      }
-
-      return mateScore - ply;
-    }
-
-    if (moveGenerator.isStalemate(
-      state: state,
-    )) {
-      return 0;
-    }
-
-    if (moveGenerator.isInsufficientMaterial(
-      state.board,
-    )) {
-      return 0;
-    }
-
-    if (depth <= 0) {
-
-      return quiescence(
-        state: state,
-        alpha: localAlpha,
-        beta: localBeta,
-        depth: quiescenceDepth,
-      );
-    }
-
-    final List<AiMove> moves =
-    _getOrderedMoves(
-      state: state,
-      hashEntry: entry,
-      ply: ply,
-    );
-
-    if (moves.isEmpty) {
-
-      return evaluator.evaluate(
-        state.board,
-      );
-    }
-
-    AiMove? bestMove;
-
-    if (state.isWhiteTurn) {
-
-      int bestScore = -infinity;
-
-      for (final AiMove move in moves) {
-
-        final AiGameState nextState =
-        _makeNextState(
-          state: state,
-          move: move,
-        );
-
-        final int score = minimax(
-          state: nextState,
-          depth: depth - 1,
-          alpha: localAlpha,
-          beta: localBeta,
-          ply: ply + 1,
-        );
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestMove = move;
-        }
-
-        localAlpha =
-            max(localAlpha, bestScore);
-
-        if (localAlpha >= localBeta) {
-          break;
-        }
-      }
-
-      _storeTransposition(
-        key: key,
-        depth: depth,
-        score: bestScore,
-        originalAlpha: originalAlpha,
-        originalBeta: originalBeta,
-        bestMove: bestMove,
-      );
-
-      return bestScore;
-
-    } else {
-
-      int bestScore = infinity;
-
-      for (final AiMove move in moves) {
-
-        final AiGameState nextState =
-        _makeNextState(
-          state: state,
-          move: move,
-        );
-
-        final int score = minimax(
-          state: nextState,
-          depth: depth - 1,
-          alpha: localAlpha,
-          beta: localBeta,
-          ply: ply + 1,
-        );
-
-        if (score < bestScore) {
-          bestScore = score;
-          bestMove = move;
-        }
-
-        localBeta =
-            min(localBeta, bestScore);
-
-        if (localAlpha >= localBeta) {
-          break;
-        }
-      }
-
-      _storeTransposition(
-        key: key,
-        depth: depth,
-        score: bestScore,
-        originalAlpha: originalAlpha,
-        originalBeta: originalBeta,
-        bestMove: bestMove,
-      );
-
-      return bestScore;
-    }
   }
 
   int minimaxTimed({
@@ -557,22 +280,23 @@ class MinimaxEngine {
       );
     }
 
-    // Null Move Pruning
     if (_canApplyNullMovePruning(
       state: state,
       depth: depth,
       inCheck: inCheck,
     )) {
-      final AiGameState nullMoveState = state.copyWith(
-        isWhiteTurn: !state.isWhiteTurn,
-        isEnemyMove: !state.isEnemyMove,
-        enPassantTargetIndex: null,
-      );
+      final bool oldIsWhiteTurn = state.isWhiteTurn;
+      final bool oldIsEnemyMove = state.isEnemyMove;
+      final int? oldEnPassant = state.enPassantTargetIndex;
+
+      state.isWhiteTurn = !state.isWhiteTurn;
+      state.isEnemyMove = !state.isEnemyMove;
+      state.enPassantTargetIndex = null;
 
       final int reduction = depth >= 7 ? 3 : 2;
 
       final int nullMoveScore = minimaxTimed(
-        state: nullMoveState,
+        state: state,
         depth: depth - 1 - reduction,
         alpha: localAlpha,
         beta: localBeta,
@@ -580,6 +304,10 @@ class MinimaxEngine {
         stopwatch: stopwatch,
         timeLimitMs: timeLimitMs,
       );
+
+      state.isWhiteTurn = oldIsWhiteTurn;
+      state.isEnemyMove = oldIsEnemyMove;
+      state.enPassantTargetIndex = oldEnPassant;
 
       if (state.isWhiteTurn) {
         if (nullMoveScore >= localBeta) {
@@ -614,7 +342,9 @@ class MinimaxEngine {
           break;
         }
 
-        final AiGameState nextState = _makeNextState(
+        final bool wasCapture = state.board[move.toIndex] != 0;
+
+        final MoveUndo undo = _makeMoveInPlace(
           state: state,
           move: move,
         );
@@ -622,7 +352,7 @@ class MinimaxEngine {
         int newDepth = depth - 1;
 
         final bool givesCheck = _moveGivesCheck(
-          state: nextState,
+          state: state,
         );
 
         final bool canReduce = _canApplyLmr(
@@ -632,6 +362,7 @@ class MinimaxEngine {
           moveIndex: moveIndex,
           inCheck: inCheck,
           givesCheck: givesCheck,
+          wasCapture: wasCapture,
         );
 
         if (canReduce && !givesCheck) {
@@ -643,7 +374,7 @@ class MinimaxEngine {
         }
 
         int score = minimaxTimed(
-          state: nextState,
+          state: state,
           depth: newDepth,
           alpha: localAlpha,
           beta: localBeta,
@@ -654,7 +385,7 @@ class MinimaxEngine {
 
         if (canReduce && score > localAlpha) {
           score = minimaxTimed(
-            state: nextState,
+            state: state,
             depth: givesCheck ? newDepth : depth - 1,
             alpha: localAlpha,
             beta: localBeta,
@@ -664,6 +395,11 @@ class MinimaxEngine {
           );
         }
 
+        _undoMoveInPlace(
+          state: state,
+          undo: undo,
+        );
+
         if (score > bestScore) {
           bestScore = score;
           bestMove = move;
@@ -672,7 +408,7 @@ class MinimaxEngine {
         localAlpha = max(localAlpha, bestScore);
 
         if (localAlpha >= localBeta) {
-          if (state.board[move.toIndex] == 0) {
+          if (!wasCapture) {
             heuristics.addKillerMove(move, ply);
             heuristics.addHistoryScore(move, depth);
           }
@@ -701,7 +437,9 @@ class MinimaxEngine {
           break;
         }
 
-        final AiGameState nextState = _makeNextState(
+        final bool wasCapture = state.board[move.toIndex] != 0;
+
+        final MoveUndo undo = _makeMoveInPlace(
           state: state,
           move: move,
         );
@@ -709,7 +447,7 @@ class MinimaxEngine {
         int newDepth = depth - 1;
 
         final bool givesCheck = _moveGivesCheck(
-          state: nextState,
+          state: state,
         );
 
         final bool canReduce = _canApplyLmr(
@@ -719,6 +457,7 @@ class MinimaxEngine {
           moveIndex: moveIndex,
           inCheck: inCheck,
           givesCheck: givesCheck,
+          wasCapture: wasCapture,
         );
 
         if (canReduce && !givesCheck) {
@@ -730,7 +469,7 @@ class MinimaxEngine {
         }
 
         int score = minimaxTimed(
-          state: nextState,
+          state: state,
           depth: newDepth,
           alpha: localAlpha,
           beta: localBeta,
@@ -741,7 +480,7 @@ class MinimaxEngine {
 
         if (canReduce && score < localBeta) {
           score = minimaxTimed(
-            state: nextState,
+            state: state,
             depth: givesCheck ? newDepth : depth - 1,
             alpha: localAlpha,
             beta: localBeta,
@@ -751,6 +490,11 @@ class MinimaxEngine {
           );
         }
 
+        _undoMoveInPlace(
+          state: state,
+          undo: undo,
+        );
+
         if (score < bestScore) {
           bestScore = score;
           bestMove = move;
@@ -759,7 +503,7 @@ class MinimaxEngine {
         localBeta = min(localBeta, bestScore);
 
         if (localAlpha >= localBeta) {
-          if (state.board[move.toIndex] == 0) {
+          if (!wasCapture) {
             heuristics.addKillerMove(move, ply);
             heuristics.addHistoryScore(move, depth);
           }
@@ -818,8 +562,6 @@ class MinimaxEngine {
       return standPat;
     }
 
-    final List<_QuiescenceCandidate> candidates = [];
-
     final List<AiMove> orderedMoves = _getOrderedMoves(
       state: state,
       hashEntry: null,
@@ -830,27 +572,8 @@ class MinimaxEngine {
       final bool isCapture = state.board[move.toIndex] != 0;
       final bool isPromotion = move.promotionPiece != null;
 
-      AiGameState? nextState;
-
-      bool givesCheck = false;
-
-      if (!isCapture && !isPromotion) {
-        if (!allowChecks) {
-          continue;
-        }
-
-        nextState = _makeNextState(
-          state: state,
-          move: move,
-        );
-
-        givesCheck = _moveGivesCheck(
-          state: nextState,
-        );
-
-        if (!givesCheck) {
-          continue;
-        }
+      if (!isCapture && !isPromotion && !allowChecks) {
+        continue;
       }
 
       if (isCapture) {
@@ -866,25 +589,36 @@ class MinimaxEngine {
         }
       }
 
-      nextState ??= _makeNextState(
+      final MoveUndo undo = _makeMoveInPlace(
         state: state,
         move: move,
       );
 
-      candidates.add(
-        _QuiescenceCandidate(
-          move: move,
-          nextState: nextState,
-        ),
-      );
-    }
+      if (!isCapture && !isPromotion) {
+        final bool givesCheck = _moveGivesCheck(
+          state: state,
+        );
 
-    for (final _QuiescenceCandidate candidate in candidates) {
+        if (!givesCheck) {
+          _undoMoveInPlace(
+            state: state,
+            undo: undo,
+          );
+
+          continue;
+        }
+      }
+
       final int score = quiescence(
-        state: candidate.nextState,
+        state: state,
         alpha: localAlpha,
         beta: localBeta,
         depth: depth - 1,
+      );
+
+      _undoMoveInPlace(
+        state: state,
+        undo: undo,
       );
 
       if (state.isWhiteTurn) {
@@ -937,89 +671,6 @@ class MinimaxEngine {
     return ZobristHasher.hash(state);
   }
 
-// REST BLEIBT UNVERÄNDERT
-
-  AiGameState _makeNextState({
-    required AiGameState state,
-    required AiMove move,
-  }) {
-    final List<int> newBoard = List<int>.from(state.board);
-
-    final bool isEnPassantMove =
-        move.piece.abs() == 1 &&
-            state.enPassantTargetIndex != null &&
-            move.toIndex == state.enPassantTargetIndex &&
-            state.board[move.toIndex] == 0 &&
-            BoardHelper.getCol(move.fromIndex) != BoardHelper.getCol(move.toIndex);
-
-    if (isEnPassantMove) {
-      final int capturedPawnIndex =
-      move.piece > 0 ? move.toIndex + 8 : move.toIndex - 8;
-
-      if (capturedPawnIndex >= 0 && capturedPawnIndex < 64) {
-        newBoard[capturedPawnIndex] = 0;
-      }
-    }
-
-    final bool isCastleMove =
-        move.piece.abs() == 6 &&
-            (BoardHelper.getCol(move.fromIndex) -
-                BoardHelper.getCol(move.toIndex))
-                .abs() ==
-                2;
-
-    BoardHelper.makeMove(
-      newBoard,
-      move.fromIndex,
-      move.toIndex,
-      promotionPiece: move.promotionPiece,
-    );
-
-    if (isCastleMove) {
-      _applyCastleRookMove(
-        board: newBoard,
-        fromIndex: move.fromIndex,
-        toIndex: move.toIndex,
-      );
-    }
-
-    return state.copyWith(
-      board: newBoard,
-      isEnemyMove: !state.isEnemyMove,
-      isWhiteTurn: !state.isWhiteTurn,
-      enPassantTargetIndex: _calculateNextEnPassantTarget(
-        move: move,
-      ),
-      castlingRights: _updateCastlingRights(
-        state: state,
-        move: move,
-      ),
-    );
-  }
-
-  void _applyCastleRookMove({
-    required List<int> board,
-    required int fromIndex,
-    required int toIndex,
-  }) {
-    final int row = BoardHelper.getRow(fromIndex);
-    final int fromCol = BoardHelper.getCol(fromIndex);
-    final int toCol = BoardHelper.getCol(toIndex);
-
-    if (toCol > fromCol) {
-      final int rookFrom = BoardHelper.getIndex(row, 7);
-      final int rookTo = BoardHelper.getIndex(row, toCol - 1);
-
-      board[rookTo] = board[rookFrom];
-      board[rookFrom] = 0;
-    } else {
-      final int rookFrom = BoardHelper.getIndex(row, 0);
-      final int rookTo = BoardHelper.getIndex(row, toCol + 1);
-
-      board[rookTo] = board[rookFrom];
-      board[rookFrom] = 0;
-    }
-  }
 
   int? _calculateNextEnPassantTarget({
     required AiMove move,
@@ -1157,25 +808,25 @@ class MinimaxEngine {
   }
 
   int _rootSeeAdjustment({
-    required AiGameState state,
+    required List<int> beforeBoard,
     required AiMove move,
+    required bool aiIsWhite,
   }) {
-    final int captured = state.board[move.toIndex];
+    final int captured = beforeBoard[move.toIndex];
 
-    // Nur echte Schlagzüge bewerten
     if (captured == 0) {
       return 0;
     }
 
     final int seeScore = see.evaluateCapture(
-      board: state.board,
+      board: beforeBoard,
       from: move.fromIndex,
       to: move.toIndex,
       movingPiece: move.piece,
     );
 
     final bool badCapture = see.isBadCapture(
-      board: state.board,
+      board: beforeBoard,
       from: move.fromIndex,
       to: move.toIndex,
       movingPiece: move.piece,
@@ -1187,7 +838,128 @@ class MinimaxEngine {
       adjustment -= 3000;
     }
 
-    return state.isWhiteTurn ? adjustment : -adjustment;
+    return aiIsWhite ? adjustment : -adjustment;
+  }
+
+  int _rootHangingPiecesAdjustment({
+    required AiGameState afterState,
+    required bool aiIsWhite,
+  }) {
+    int penalty = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = afterState.board[i];
+
+      if (piece == 0) continue;
+      if ((piece > 0) != aiIsWhite) continue;
+      if (piece.abs() == 1 || piece.abs() == 6) continue;
+
+      final bool attacked = see.isSquareAttackedBySide(
+        afterState.board,
+        i,
+        byWhite: !aiIsWhite,
+      );
+
+      if (!attacked) continue;
+
+      final bool defended = see.isSquareAttackedBySide(
+        afterState.board,
+        i,
+        byWhite: aiIsWhite,
+      );
+
+      final int value = evaluator.pieceValue(piece).abs();
+
+      if (!defended) {
+        penalty += value * 2;
+      } else {
+        penalty += value ~/ 2;
+      }
+    }
+
+    if (penalty == 0) {
+      return 0;
+    }
+
+    return aiIsWhite ? -penalty : penalty;
+  }
+
+  int _rootAttackedPieceEscapeBonus({
+    required List<int> beforeBoard,
+    required List<int> afterBoard,
+    required AiMove move,
+    required bool aiIsWhite,
+  }) {
+    final int movedPiece = move.piece.abs();
+
+    if (movedPiece == 1 || movedPiece == 6) {
+      return 0;
+    }
+
+    final bool wasAttacked = see.isSquareAttackedBySide(
+      beforeBoard,
+      move.fromIndex,
+      byWhite: !aiIsWhite,
+    );
+
+    if (!wasAttacked) {
+      return 0;
+    }
+
+    final bool stillExistsOnTarget =
+        afterBoard[move.toIndex].abs() == movedPiece &&
+            (afterBoard[move.toIndex] > 0) == aiIsWhite;
+
+    if (!stillExistsOnTarget) {
+      return 0;
+    }
+
+    final bool stillAttacked = see.isSquareAttackedBySide(
+      afterBoard,
+      move.toIndex,
+      byWhite: !aiIsWhite,
+    );
+
+    final int value = evaluator.pieceValue(move.piece).abs();
+
+    if (!stillAttacked) {
+      return aiIsWhite ? value : -value;
+    }
+
+    return aiIsWhite ? -(value ~/ 2) : (value ~/ 2);
+  }
+
+  int _rootOpponentMateThreatAdjustment({
+    required AiGameState afterState,
+    required bool aiIsWhite,
+  }) {
+    final List<AiMove> opponentMoves = _getOrderedMoves(
+      state: afterState,
+      hashEntry: null,
+      ply: 1,
+    );
+
+    for (final AiMove opponentMove in opponentMoves) {
+      final MoveUndo undo = _makeMoveInPlace(
+        state: afterState,
+        move: opponentMove,
+      );
+
+      final bool mate = moveGenerator.isCheckmate(
+        state: afterState,
+      );
+
+      _undoMoveInPlace(
+        state: afterState,
+        undo: undo,
+      );
+
+      if (mate) {
+        return aiIsWhite ? -mateScore ~/ 2 : mateScore ~/ 2;
+      }
+    }
+
+    return 0;
   }
 
   int _rootOpponentThreatAdjustment({
@@ -1247,123 +1019,6 @@ class MinimaxEngine {
     return aiIsWhite ? -penalty : penalty;
   }
 
-  int _rootAttackedPieceEscapeBonus({
-    required AiGameState beforeState,
-    required AiGameState afterState,
-    required AiMove move,
-  }) {
-    final bool aiIsWhite = beforeState.isWhiteTurn;
-
-    final int movedPiece = move.piece.abs();
-
-    if (movedPiece == 1 || movedPiece == 6) {
-      return 0;
-    }
-
-    final bool wasAttacked = see.isSquareAttackedBySide(
-      beforeState.board,
-      move.fromIndex,
-      byWhite: !aiIsWhite,
-    );
-
-    if (!wasAttacked) {
-      return 0;
-    }
-
-    final bool stillExistsOnTarget =
-        afterState.board[move.toIndex].abs() == movedPiece &&
-            (afterState.board[move.toIndex] > 0) == aiIsWhite;
-
-    if (!stillExistsOnTarget) {
-      return 0;
-    }
-
-    final bool stillAttacked = see.isSquareAttackedBySide(
-      afterState.board,
-      move.toIndex,
-      byWhite: !aiIsWhite,
-    );
-
-    final int value = evaluator.pieceValue(move.piece).abs();
-
-    if (!stillAttacked) {
-      return aiIsWhite ? value : -value;
-    }
-
-    return aiIsWhite ? -(value ~/ 2) : (value ~/ 2);
-  }
-
-  int _rootOpponentMateThreatAdjustment({
-    required AiGameState afterState,
-    required bool aiIsWhite,
-  }) {
-    final List<AiMove> opponentMoves = _getOrderedMoves(
-      state: afterState,
-      hashEntry: null,
-      ply: 1,
-    );
-
-    for (final AiMove opponentMove in opponentMoves) {
-      final AiGameState replyState = _makeNextState(
-        state: afterState,
-        move: opponentMove,
-      );
-
-      if (moveGenerator.isCheckmate(state: replyState)) {
-        return aiIsWhite ? -mateScore ~/ 2 : mateScore ~/ 2;
-      }
-    }
-
-    return 0;
-  }
-
-
-  int _rootHangingPiecesAdjustment({
-    required AiGameState beforeState,
-    required AiGameState afterState,
-  }) {
-    int penalty = 0;
-
-    final bool aiIsWhite = beforeState.isWhiteTurn;
-
-    for (int i = 0; i < 64; i++) {
-      final int piece = afterState.board[i];
-
-      if (piece == 0) continue;
-      if ((piece > 0) != aiIsWhite) continue;
-      if (piece.abs() == 1 || piece.abs() == 6) continue;
-
-      final bool attacked = see.isSquareAttackedBySide(
-        afterState.board,
-        i,
-        byWhite: !aiIsWhite,
-      );
-
-      if (!attacked) continue;
-
-      final bool defended = see.isSquareAttackedBySide(
-        afterState.board,
-        i,
-        byWhite: aiIsWhite,
-      );
-
-      final int value = evaluator.pieceValue(piece).abs();
-
-      if (!defended) {
-        penalty += value * 2;
-      } else {
-        penalty += value ~/ 2;
-      }
-
-    }
-
-    if (penalty == 0) {
-      return 0;
-    }
-
-    return aiIsWhite ? -penalty : penalty;
-  }
-
   bool _canApplyLmr({
     required AiMove move,
     required AiGameState state,
@@ -1371,37 +1026,15 @@ class MinimaxEngine {
     required int moveIndex,
     required bool inCheck,
     required bool givesCheck,
+    required bool wasCapture,
   }) {
-    if (depth < 4) {
-      return false;
-    }
-
-    if (moveIndex < 6) {
-      return false;
-    }
-
-    if (inCheck) {
-      return false;
-    }
-
-    // Schachzüge niemals reduzieren
-    if (givesCheck) {
-      return false;
-    }
-
-    final bool isCapture = state.board[move.toIndex] != 0;
-
-    if (isCapture) {
-      return false;
-    }
-
-    if (move.promotionPiece != null) {
-      return false;
-    }
-
-    if (move.piece.abs() == 6) {
-      return false;
-    }
+    if (depth < 4) return false;
+    if (moveIndex < 6) return false;
+    if (inCheck) return false;
+    if (givesCheck) return false;
+    if (wasCapture) return false;
+    if (move.promotionPiece != null) return false;
+    if (move.piece.abs() == 6) return false;
 
     return true;
   }
@@ -1505,8 +1138,8 @@ class MinimaxEngine {
       int maxDepth,
       ) {
     final List<String> pv = [];
+    final List<MoveUndo> undoStack = [];
 
-    AiGameState currentState = state;
     AiMove? currentMove = bestMove;
 
     for (int i = 0; i < maxDepth; i++) {
@@ -1517,23 +1150,23 @@ class MinimaxEngine {
             "${BoardHelper.indexToCoord(currentMove.toIndex)}",
       );
 
-      currentState = _makeNextState(
-        state: currentState,
+      final MoveUndo undo = _makeMoveInPlace(
+        state: state,
         move: currentMove,
       );
 
+      undoStack.add(undo);
+
       final int key = _buildTranspositionKey(
-        state: currentState,
+        state: state,
       );
 
-      final TranspositionEntry? entry =
-      transpositionTable.get(key);
+      final TranspositionEntry? entry = transpositionTable.get(key);
 
       if (entry == null) break;
       if (entry.bestFrom == null || entry.bestTo == null) break;
 
-      final int piece =
-      currentState.board[entry.bestFrom!];
+      final int piece = state.board[entry.bestFrom!];
 
       if (piece == 0) break;
 
@@ -1546,21 +1179,190 @@ class MinimaxEngine {
       );
     }
 
+    for (int i = undoStack.length - 1; i >= 0; i--) {
+      _undoMoveInPlace(
+        state: state,
+        undo: undoStack[i],
+      );
+    }
+
     return pv.join(" ");
   }
 
-  @visibleForTesting
-  AiGameState makeNextStateForTest({
+  int perft({
     required AiGameState state,
-    required AiMove move,
+    required int depth,
   }) {
-    return _makeNextState(
+    return perftMakeUndo(
       state: state,
-      move: move,
+      depth: depth,
     );
   }
 
-  int perft({
+
+  Map<String, int> dividePerft({
+    required AiGameState state,
+    required int depth,
+  }) {
+    final Map<String, int> result = {};
+
+    final List<AiMove> moves = _getOrderedMoves(
+      state: state,
+      hashEntry: null,
+      ply: 0,
+    );
+
+    for (final AiMove move in moves) {
+      final MoveUndo undo = _makeMoveInPlace(
+        state: state,
+        move: move,
+      );
+
+      final String moveName =
+          "${BoardHelper.indexToCoord(move.fromIndex)}"
+          "${BoardHelper.indexToCoord(move.toIndex)}";
+
+      result[moveName] = perftMakeUndo(
+        state: state,
+        depth: depth - 1,
+      );
+
+      _undoMoveInPlace(
+        state: state,
+        undo: undo,
+      );
+    }
+
+    return result;
+  }
+
+  MoveUndo _makeMoveInPlace({
+    required AiGameState state,
+    required AiMove move,
+  }) {
+    final List<int> board = state.board;
+
+    final int movedPiece = board[move.fromIndex];
+    final int capturedPiece = board[move.toIndex];
+
+    final bool oldIsWhiteTurn = state.isWhiteTurn;
+    final bool oldIsEnemyMove = state.isEnemyMove;
+    final int? oldEnPassantTargetIndex = state.enPassantTargetIndex;
+    final AiCastlingRights oldCastlingRights = state.castlingRights;
+
+    // Wichtig: vor der Brettänderung berechnen,
+    // weil _updateCastlingRights() das geschlagene Zielfeld ausliest.
+    final AiCastlingRights newCastlingRights = _updateCastlingRights(
+      state: state,
+      move: move,
+    );
+
+    final bool isEnPassantMove =
+        movedPiece.abs() == 1 &&
+            state.enPassantTargetIndex != null &&
+            move.toIndex == state.enPassantTargetIndex &&
+            board[move.toIndex] == 0 &&
+            BoardHelper.getCol(move.fromIndex) != BoardHelper.getCol(move.toIndex);
+
+    int? enPassantCapturedIndex;
+    int? enPassantCapturedPiece;
+
+    if (isEnPassantMove) {
+      enPassantCapturedIndex =
+      movedPiece > 0 ? move.toIndex + 8 : move.toIndex - 8;
+
+      enPassantCapturedPiece = board[enPassantCapturedIndex];
+      board[enPassantCapturedIndex] = 0;
+    }
+
+    final bool isCastleMove =
+        movedPiece.abs() == 6 &&
+            (BoardHelper.getCol(move.fromIndex) -
+                BoardHelper.getCol(move.toIndex))
+                .abs() ==
+                2;
+
+    int? rookFrom;
+    int? rookTo;
+    int? rookPiece;
+
+    board[move.fromIndex] = 0;
+    board[move.toIndex] = move.promotionPiece ?? movedPiece;
+
+    if (isCastleMove) {
+      final int row = BoardHelper.getRow(move.fromIndex);
+      final int fromCol = BoardHelper.getCol(move.fromIndex);
+      final int toCol = BoardHelper.getCol(move.toIndex);
+
+      if (toCol > fromCol) {
+        rookFrom = BoardHelper.getIndex(row, 7);
+        rookTo = BoardHelper.getIndex(row, toCol - 1);
+      } else {
+        rookFrom = BoardHelper.getIndex(row, 0);
+        rookTo = BoardHelper.getIndex(row, toCol + 1);
+      }
+
+      rookPiece = board[rookFrom];
+
+      board[rookTo] = board[rookFrom];
+      board[rookFrom] = 0;
+    }
+
+    state.enPassantTargetIndex = _calculateNextEnPassantTarget(
+      move: move,
+    );
+
+    state.castlingRights = newCastlingRights;
+
+    state.isWhiteTurn = !state.isWhiteTurn;
+    state.isEnemyMove = !state.isEnemyMove;
+
+    return MoveUndo(
+      fromIndex: move.fromIndex,
+      toIndex: move.toIndex,
+      movedPiece: movedPiece,
+      capturedPiece: capturedPiece,
+      oldIsWhiteTurn: oldIsWhiteTurn,
+      oldIsEnemyMove: oldIsEnemyMove,
+      oldEnPassantTargetIndex: oldEnPassantTargetIndex,
+      oldCastlingRights: oldCastlingRights,
+      wasEnPassant: isEnPassantMove,
+      enPassantCapturedIndex: enPassantCapturedIndex,
+      enPassantCapturedPiece: enPassantCapturedPiece,
+      wasCastle: isCastleMove,
+      rookFrom: rookFrom,
+      rookTo: rookTo,
+      rookPiece: rookPiece,
+    );
+  }
+
+  void _undoMoveInPlace({
+    required AiGameState state,
+    required MoveUndo undo,
+  }) {
+    final List<int> board = state.board;
+
+    state.isWhiteTurn = undo.oldIsWhiteTurn;
+    state.isEnemyMove = undo.oldIsEnemyMove;
+    state.enPassantTargetIndex = undo.oldEnPassantTargetIndex;
+    state.castlingRights = undo.oldCastlingRights;
+
+    if (undo.wasCastle) {
+      board[undo.rookFrom!] = undo.rookPiece!;
+      board[undo.rookTo!] = 0;
+    }
+
+    board[undo.fromIndex] = undo.movedPiece;
+    board[undo.toIndex] = undo.capturedPiece;
+
+    if (undo.wasEnPassant) {
+      board[undo.enPassantCapturedIndex!] =
+      undo.enPassantCapturedPiece!;
+    }
+  }
+
+
+  int perftMakeUndo({
     required AiGameState state,
     required int depth,
   }) {
@@ -1581,73 +1383,84 @@ class MinimaxEngine {
     int nodes = 0;
 
     for (final AiMove move in moves) {
-      final AiGameState nextState = _makeNextState(
+      final MoveUndo undo = _makeMoveInPlace(
         state: state,
         move: move,
       );
 
-      nodes += perft(
-        state: nextState,
+      nodes += perftMakeUndo(
+        state: state,
         depth: depth - 1,
+      );
+
+      _undoMoveInPlace(
+        state: state,
+        undo: undo,
       );
     }
 
     return nodes;
   }
 
-  bool _isPromotionMove(AiMove move) {
-    if (move.piece.abs() != 1) {
-      return false;
-    }
-
-    final int toRow = BoardHelper.getRow(move.toIndex);
-
-    if (move.piece > 0) {
-      return toRow == 0;
-    }
-
-    return toRow == 7;
-  }
-
-  Map<String, int> dividePerft({
+  MoveUndo makeMoveInPlaceForTest({
     required AiGameState state,
-    required int depth,
+    required AiMove move,
   }) {
-    final Map<String, int> result = {};
-
-    final List<AiMove> moves = _getOrderedMoves(
+    return _makeMoveInPlace(
       state: state,
-      hashEntry: null,
-      ply: 0,
+      move: move,
     );
-
-    for (final AiMove move in moves) {
-      final AiGameState nextState = _makeNextState(
-        state: state,
-        move: move,
-      );
-
-      final String moveName =
-          "${BoardHelper.indexToCoord(move.fromIndex)}"
-          "${BoardHelper.indexToCoord(move.toIndex)}";
-
-      result[moveName] = perft(
-        state: nextState,
-        depth: depth - 1,
-      );
-    }
-
-    return result;
   }
+
+  void undoMoveInPlaceForTest({
+    required AiGameState state,
+    required MoveUndo undo,
+  }) {
+    _undoMoveInPlace(
+      state: state,
+      undo: undo,
+    );
+  }
+
 
 }
 
-class _QuiescenceCandidate {
-  final AiMove move;
-  final AiGameState nextState;
 
-  const _QuiescenceCandidate({
-    required this.move,
-    required this.nextState,
+class MoveUndo {
+  final int fromIndex;
+  final int toIndex;
+  final int movedPiece;
+  final int capturedPiece;
+
+  final bool oldIsWhiteTurn;
+  final bool oldIsEnemyMove;
+  final int? oldEnPassantTargetIndex;
+  final AiCastlingRights oldCastlingRights;
+
+  final bool wasEnPassant;
+  final int? enPassantCapturedIndex;
+  final int? enPassantCapturedPiece;
+
+  final bool wasCastle;
+  final int? rookFrom;
+  final int? rookTo;
+  final int? rookPiece;
+
+  const MoveUndo({
+    required this.fromIndex,
+    required this.toIndex,
+    required this.movedPiece,
+    required this.capturedPiece,
+    required this.oldIsWhiteTurn,
+    required this.oldIsEnemyMove,
+    required this.oldEnPassantTargetIndex,
+    required this.oldCastlingRights,
+    required this.wasEnPassant,
+    this.enPassantCapturedIndex,
+    this.enPassantCapturedPiece,
+    required this.wasCastle,
+    this.rookFrom,
+    this.rookTo,
+    this.rookPiece,
   });
 }

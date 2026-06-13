@@ -33,13 +33,19 @@ void main() {
       score: 0,
     );
 
-    final nextState = engine.makeNextStateForTest(
+    final undo = engine.makeMoveInPlaceForTest(
       state: state,
       move: move,
     );
 
-    expect(nextState.board[BoardHelper.getIndex(3, 3)], 0); // d5 leer
-    expect(nextState.board[BoardHelper.getIndex(2, 3)], 1); // Bauer auf d6
+    expect(state.board[BoardHelper.getIndex(3, 3)], 0);
+    expect(state.board[BoardHelper.getIndex(2, 3)], 1);
+
+    engine.undoMoveInPlaceForTest(
+      state: state,
+      undo: undo,
+    );
+
   });
 
   test('Promotion wandelt Bauern korrekt in Dame um', () {
@@ -54,13 +60,19 @@ void main() {
       score: 0,
     );
 
-    final nextState = engine.makeNextStateForTest(
+    final undo = engine.makeMoveInPlaceForTest(
       state: state,
       move: move,
     );
 
-    expect(nextState.board[BoardHelper.getIndex(1, 0)], 0);
-    expect(nextState.board[BoardHelper.getIndex(0, 0)], 5);
+    expect(state.board[BoardHelper.getIndex(1, 0)], 0);
+    expect(state.board[BoardHelper.getIndex(0, 0)], 5);
+
+    engine.undoMoveInPlaceForTest(
+      state: state,
+      undo: undo,
+    );
+
   });
 
   test(
@@ -238,25 +250,34 @@ void main() {
     final moves = generator.getAllLegalAiMoves(state: state);
 
     for (final move in moves) {
-      final nextState = createEngine().makeNextStateForTest(
+
+      final engine = createEngine();
+
+      final undo = engine.makeMoveInPlaceForTest(
         state: state,
         move: move,
       );
 
-      final whiteKingIndex = BoardHelper.getKingIndex(nextState.board, true);
-      final blackKingIndex = BoardHelper.getKingIndex(nextState.board, false);
+      final whiteKingIndex = BoardHelper.getKingIndex(state.board, true);
+      final blackKingIndex = BoardHelper.getKingIndex(state.board, false);
 
       expect(whiteKingIndex, isNotNull);
       expect(blackKingIndex, isNotNull);
 
       final stillInCheck = generator.isKingInCheck(
-        state: nextState,
+        state: state,
         isWhiteKing: true,
         whiteKingIndex: whiteKingIndex!,
         blackKingIndex: blackKingIndex!,
       );
 
+      engine.undoMoveInPlaceForTest(
+        state: state,
+        undo: undo,
+      );
+
       expect(stillInCheck, false);
+
     }
   });
 
