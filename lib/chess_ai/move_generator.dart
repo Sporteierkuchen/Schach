@@ -1,5 +1,6 @@
-import '../components/FigurenMovesArray.dart';
+
 import 'ai_game_state.dart';
+import 'ai_move.dart';
 import 'board_helper.dart';
 
 class MoveGenerator {
@@ -7,37 +8,69 @@ class MoveGenerator {
   bool debugLegalMoves = false;
   bool debugCastlingOnly = false;
 
-  List<FigurenMovesArray> getAllLegalMoves({
+  List<AiMove> getAllLegalAiMoves({
     required AiGameState state,
   }) {
-    final List<FigurenMovesArray> allMoves = [];
+    final List<AiMove> moves = [];
 
     for (int i = 0; i < 64; i++) {
       final int piece = state.board[i];
 
       if (piece == 0) continue;
-
       if (state.isWhiteTurn && piece < 0) continue;
       if (!state.isWhiteTurn && piece > 0) continue;
 
-      final List<int> legalTargets = getLegalMovesForPiece(
+      final List<int> targets = getLegalMovesForPiece(
         state: state,
         index: i,
         piece: piece,
       );
 
-      if (legalTargets.isNotEmpty) {
-        allMoves.add(
-          FigurenMovesArray(
-            fromIndex: i,
-            piece: piece,
-            targetIndices: legalTargets,
-          ),
-        );
+      for (final int target in targets) {
+        if (_isPromotionTarget(piece, target)) {
+          final List<int> promotionPieces = piece > 0
+              ? [5, 4, 3, 2]
+              : [-5, -4, -3, -2];
+
+          for (final int promotionPiece in promotionPieces) {
+            moves.add(
+              AiMove(
+                fromIndex: i,
+                toIndex: target,
+                piece: piece,
+                promotionPiece: promotionPiece,
+                score: 0,
+              ),
+            );
+          }
+        } else {
+          moves.add(
+            AiMove(
+              fromIndex: i,
+              toIndex: target,
+              piece: piece,
+              score: 0,
+            ),
+          );
+        }
       }
     }
 
-    return allMoves;
+    return moves;
+  }
+
+  bool _isPromotionTarget(int piece, int targetIndex) {
+    if (piece.abs() != 1) {
+      return false;
+    }
+
+    final int row = BoardHelper.getRow(targetIndex);
+
+    if (piece > 0) {
+      return row == 0;
+    }
+
+    return row == 7;
   }
 
   List<int> getLegalMovesForPiece({
@@ -125,11 +158,10 @@ class MoveGenerator {
       return false;
     }
 
-    return !isKingInCheck(
-      state: state.copyWith(board: copy),
-      isWhiteKing: state.isWhiteTurn,
-      whiteKingIndex: whiteKingIndex,
-      blackKingIndex: blackKingIndex,
+    return !_isSquareAttackedBySide(
+      board: copy,
+      targetIndex: state.isWhiteTurn ? whiteKingIndex : blackKingIndex,
+      byWhite: !state.isWhiteTurn,
     );
   }
 
@@ -166,31 +198,11 @@ class MoveGenerator {
   }) {
     final int kingIndex = isWhiteKing ? whiteKingIndex : blackKingIndex;
 
-    for (int i = 0; i < 64; i++) {
-      final int piece = state.board[i];
-
-      if (piece == 0) continue;
-
-      final bool isOpponent = isWhiteKing ? piece < 0 : piece > 0;
-
-      if (!isOpponent) continue;
-
-      final List<int> attacks = getRawMoves(
-        state: state.copyWith(
-          isEnemyMove: !state.isEnemyMove,
-          isWhiteTurn: !state.isWhiteTurn,
-        ),
-        index: i,
-        piece: piece,
-        includeCastling: false,
-      );
-
-      if (attacks.contains(kingIndex)) {
-        return true;
-      }
-    }
-
-    return false;
+    return _isSquareAttackedBySide(
+      board: state.board,
+      targetIndex: kingIndex,
+      byWhite: !isWhiteKing,
+    );
   }
 
   List<int> getRawMoves({
@@ -421,7 +433,7 @@ class MoveGenerator {
     return moves;
   }
 
-  bool _castlePathIsFree(
+/*  bool _castlePathIsFree(
       List<int> board,
       int row,
       int fromCol,
@@ -444,6 +456,35 @@ class MoveGenerator {
     }
 
     return true;
+  }*/
+
+  bool _castlePathIsFree(
+      List<int> board,
+      int row,
+      int fromCol,
+      int toCol,
+      ) {
+    // kurze Rochade: König e -> g
+    // Felder zwischen König und Turm: f, g
+    if (toCol == 6) {
+      final int f = BoardHelper.getIndex(row, 5);
+      final int g = BoardHelper.getIndex(row, 6);
+
+      return board[f] == 0 && board[g] == 0;
+    }
+
+    // lange Rochade: König e -> c
+    // Felder zwischen König und Turm: d, c, b
+    // König läuft nur über d und c, aber b muss für den Turm frei sein.
+    if (toCol == 2) {
+      final int d = BoardHelper.getIndex(row, 3);
+      final int c = BoardHelper.getIndex(row, 2);
+      final int b = BoardHelper.getIndex(row, 1);
+
+      return board[d] == 0 && board[c] == 0 && board[b] == 0;
+    }
+
+    return false;
   }
 
   bool _castlePathIsSafe(
@@ -596,7 +637,7 @@ class MoveGenerator {
 
     if (!kingInCheck) return false;
 
-    final moves = getAllLegalMoves(state: state);
+    final List<AiMove> moves = getAllLegalAiMoves(state: state);
 
     return moves.isEmpty;
   }
@@ -618,7 +659,7 @@ class MoveGenerator {
 
     if (kingInCheck) return false;
 
-    final moves = getAllLegalMoves(state: state);
+    final List<AiMove> moves = getAllLegalAiMoves(state: state);
 
     return moves.isEmpty;
   }

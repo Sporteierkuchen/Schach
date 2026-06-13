@@ -103,16 +103,11 @@ class OpeningBookService {
         candidates
     );
 
-    final grouped =
-    moveGenerator
-        .getAllLegalMoves(
-      state: state,
-    );
-
-    final legal =
-    moveOrdering
-        .flattenAndOrderMoves(
-      grouped,
+    final List<AiMove> legal =
+    moveOrdering.orderAiMoves(
+      moveGenerator.getAllLegalAiMoves(
+        state: state,
+      ),
       state.board,
     );
 

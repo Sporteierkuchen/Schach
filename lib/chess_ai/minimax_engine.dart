@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/cupertino.dart';
 import 'package:schach/chess_ai/search_heuristics.dart';
 import 'package:schach/chess_ai/static_exchange_evaluator.dart';
 import 'ai_game_state.dart';
@@ -914,13 +915,12 @@ class MinimaxEngine {
     int ply = 0,
   }) {
 
-    final groupedMoves =
-    moveGenerator.getAllLegalMoves(
+    final List<AiMove> moves = moveGenerator.getAllLegalAiMoves(
       state: state,
     );
 
-    return moveOrdering.flattenAndOrderMoves(
-      groupedMoves,
+    return moveOrdering.orderAiMoves(
+      moves,
       state.board,
       hashFrom: hashEntry?.bestFrom,
       hashTo: hashEntry?.bestTo,
@@ -928,6 +928,7 @@ class MinimaxEngine {
       heuristics: heuristics,
       ply: ply,
     );
+
   }
 
   int _buildTranspositionKey({
@@ -1548,8 +1549,98 @@ class MinimaxEngine {
     return pv.join(" ");
   }
 
-}
+  @visibleForTesting
+  AiGameState makeNextStateForTest({
+    required AiGameState state,
+    required AiMove move,
+  }) {
+    return _makeNextState(
+      state: state,
+      move: move,
+    );
+  }
 
+  int perft({
+    required AiGameState state,
+    required int depth,
+  }) {
+    if (depth == 0) {
+      return 1;
+    }
+
+    final List<AiMove> moves = _getOrderedMoves(
+      state: state,
+      hashEntry: null,
+      ply: 0,
+    );
+
+    if (depth == 1) {
+      return moves.length;
+    }
+
+    int nodes = 0;
+
+    for (final AiMove move in moves) {
+      final AiGameState nextState = _makeNextState(
+        state: state,
+        move: move,
+      );
+
+      nodes += perft(
+        state: nextState,
+        depth: depth - 1,
+      );
+    }
+
+    return nodes;
+  }
+
+  bool _isPromotionMove(AiMove move) {
+    if (move.piece.abs() != 1) {
+      return false;
+    }
+
+    final int toRow = BoardHelper.getRow(move.toIndex);
+
+    if (move.piece > 0) {
+      return toRow == 0;
+    }
+
+    return toRow == 7;
+  }
+
+  Map<String, int> dividePerft({
+    required AiGameState state,
+    required int depth,
+  }) {
+    final Map<String, int> result = {};
+
+    final List<AiMove> moves = _getOrderedMoves(
+      state: state,
+      hashEntry: null,
+      ply: 0,
+    );
+
+    for (final AiMove move in moves) {
+      final AiGameState nextState = _makeNextState(
+        state: state,
+        move: move,
+      );
+
+      final String moveName =
+          "${BoardHelper.indexToCoord(move.fromIndex)}"
+          "${BoardHelper.indexToCoord(move.toIndex)}";
+
+      result[moveName] = perft(
+        state: nextState,
+        depth: depth - 1,
+      );
+    }
+
+    return result;
+  }
+
+}
 
 class _QuiescenceCandidate {
   final AiMove move;

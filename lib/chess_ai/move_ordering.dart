@@ -35,61 +35,94 @@ class MoveOrdering {
           for (final int p in promos) {
             final int promotionPiece = group.piece > 0 ? p : -p;
 
-            final int moveScore = _scoreMove(
-              board,
-              group.fromIndex,
-              target,
-              group.piece,
-              promotionPiece,
-              hashFrom,
-              hashTo,
-              hashPromotion,
-              heuristics,
-              ply,
-            );
-
             moves.add(
               AiMove(
                 fromIndex: group.fromIndex,
                 toIndex: target,
                 piece: group.piece,
                 promotionPiece: promotionPiece,
-                score: moveScore,
+                score: _scoreMove(
+                  board,
+                  group.fromIndex,
+                  target,
+                  group.piece,
+                  promotionPiece,
+                  hashFrom,
+                  hashTo,
+                  hashPromotion,
+                  heuristics,
+                  ply,
+                ),
               ),
             );
           }
         } else {
-          final int moveScore = _scoreMove(
-            board,
-            group.fromIndex,
-            target,
-            group.piece,
-            null,
-            hashFrom,
-            hashTo,
-            hashPromotion,
-            heuristics,
-            ply,
-          );
-
           moves.add(
             AiMove(
               fromIndex: group.fromIndex,
               toIndex: target,
               piece: group.piece,
               promotionPiece: null,
-              score: moveScore,
+              score: _scoreMove(
+                board,
+                group.fromIndex,
+                target,
+                group.piece,
+                null,
+                hashFrom,
+                hashTo,
+                hashPromotion,
+                heuristics,
+                ply,
+              ),
             ),
           );
         }
       }
     }
 
-    moves.sort((a, b) {
-      return b.score.compareTo(a.score);
-    });
+    moves.sort((a, b) => b.score.compareTo(a.score));
 
     return moves;
+  }
+
+  List<AiMove> orderAiMoves(
+      List<AiMove> moves,
+      List<int> board, {
+        int? hashFrom,
+        int? hashTo,
+        int? hashPromotion,
+        SearchHeuristics? heuristics,
+        int ply = 0,
+      }) {
+    final List<AiMove> orderedMoves = [];
+
+    for (final AiMove move in moves) {
+      orderedMoves.add(
+        AiMove(
+          fromIndex: move.fromIndex,
+          toIndex: move.toIndex,
+          piece: move.piece,
+          promotionPiece: move.promotionPiece,
+          score: _scoreMove(
+            board,
+            move.fromIndex,
+            move.toIndex,
+            move.piece,
+            move.promotionPiece,
+            hashFrom,
+            hashTo,
+            hashPromotion,
+            heuristics,
+            ply,
+          ),
+        ),
+      );
+    }
+
+    orderedMoves.sort((a, b) => b.score.compareTo(a.score));
+
+    return orderedMoves;
   }
 
   int _scoreMove(
@@ -106,7 +139,6 @@ class MoveOrdering {
       ) {
     int score = 0;
 
-    // 1. Hash-Move aus Transposition Table immer zuerst prüfen
     if (hashFrom == from && hashTo == to && hashPromotion == promotionPiece) {
       score += 1000000;
     }
@@ -119,24 +151,20 @@ class MoveOrdering {
       score: 0,
     );
 
-    // 2. Killer Moves
     if (heuristics != null && heuristics.isKillerMove(tempMove, ply)) {
       score += 500000;
     }
 
-    // 3. History Heuristic
     if (heuristics != null) {
       score += heuristics.getHistoryScore(tempMove);
     }
 
     final int captured = board[to];
 
-    // 4. Schlagzüge mit SEE bewerten
     if (captured != 0) {
       final int victimValue = evaluator.pieceValue(captured).abs();
       final int attackerValue = evaluator.pieceValue(piece).abs();
 
-      // MVV-LVA: wertvolle Figur schlagen, billige Figur bevorzugen
       score += victimValue * 10 - attackerValue;
 
       final int seeScore = see.evaluateCapture(
@@ -146,7 +174,6 @@ class MoveOrdering {
         movingPiece: piece,
       );
 
-      // Guter Tausch wird stark bevorzugt
       score += seeScore * 8;
 
       final bool badCapture = see.isBadCapture(
@@ -156,18 +183,15 @@ class MoveOrdering {
         movingPiece: piece,
       );
 
-      // Schlechter Tausch sehr weit nach hinten
       if (badCapture) {
         score -= 8000;
       }
 
-      // Kleine Figur schlägt große/gleichwertige Figur
       if (attackerValue <= victimValue) {
         score += 300;
       }
     }
 
-    // 5. Promotionen bevorzugen
     if (promotionPiece != null) {
       score += evaluator.pieceValue(promotionPiece).abs();
 
@@ -176,7 +200,6 @@ class MoveOrdering {
       }
     }
 
-    // 6. Zentrum leicht bevorzugen
     final int toRow = to ~/ 8;
     final int toCol = to % 8;
 
