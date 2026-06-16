@@ -160,8 +160,6 @@ class _MatchHistoryPageState extends State<MatchHistoryPage> {
       },
     );
 
-    nameController.dispose();
-
     if (name == null || name.trim().isEmpty) {
       return;
     }

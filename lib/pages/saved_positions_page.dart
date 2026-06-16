@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:schach/models/saved_position.dart';
 import '../chess_ai/services/position_storage_service.dart';
 import '../components/Enums.dart';
@@ -102,7 +103,58 @@ class _SavedPositionsPageState extends State<SavedPositionsPage> {
     await _load();
   }
 
-  void _logTestMethod(SavedPosition position) {
+  Future<void> _showTestMethodDialog(SavedPosition position) async {
+    final String code = _createTestMethodCode(position);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Testmethode"),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: SelectableText(
+                code,
+                style: const TextStyle(
+                  fontFamily: "monospace",
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await Clipboard.setData(
+                  ClipboardData(text: code),
+                );
+
+                if (!context.mounted) return;
+
+                Navigator.pop(context);
+
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Testmethode wurde kopiert."),
+                  ),
+                );
+              },
+              child: const Text("Kopieren"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text("Schließen"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _createTestMethodCode(SavedPosition position) {
     String methodName = position.name
         .trim()
         .replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '')
@@ -183,9 +235,7 @@ class _SavedPositionsPageState extends State<SavedPositionsPage> {
     buffer.writeln("  );");
     buffer.writeln("}");
 
-    debugPrint("===== Testmethode für ${position.name} =====");
-    debugPrint(buffer.toString());
-    debugPrint("===== Ende Testmethode =====");
+    return buffer.toString();
   }
 
   void _logJson(SavedPosition position) {
@@ -319,7 +369,7 @@ class _SavedPositionsPageState extends State<SavedPositionsPage> {
                         IconButton(
                           tooltip: "Testmethode loggen",
                           icon: const Icon(Icons.science),
-                          onPressed: () => _logTestMethod(pos),
+                          onPressed: () => _showTestMethodDialog(pos),
                         ),
                         IconButton(
                           tooltip: "JSON loggen",
