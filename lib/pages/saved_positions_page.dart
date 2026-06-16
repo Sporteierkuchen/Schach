@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:schach/models/saved_position.dart';
 import '../chess_ai/services/position_storage_service.dart';
+import '../components/Enums.dart';
+import '../components/Schachfigur.dart';
 
 enum SavedPositionSortMode {
   newestFirst,
@@ -98,6 +100,92 @@ class _SavedPositionsPageState extends State<SavedPositionsPage> {
 
     await PositionStorageService.deletePosition(position.id);
     await _load();
+  }
+
+  void _logTestMethod(SavedPosition position) {
+    String methodName = position.name
+        .trim()
+        .replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '')
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) {
+      return part[0].toUpperCase() + part.substring(1);
+    })
+        .join();
+
+    if (methodName.isEmpty) {
+      methodName = "SavedPosition";
+    }
+
+    methodName = methodName[0].toLowerCase() + methodName.substring(1);
+
+    int pieceCode(Schachfigur fig) {
+      int code;
+
+      switch (fig.art) {
+        case Schachfigurenart.BAUER:
+          code = 1;
+          break;
+        case Schachfigurenart.SPRINGER:
+          code = 2;
+          break;
+        case Schachfigurenart.LAEUFER:
+          code = 3;
+          break;
+        case Schachfigurenart.TURM:
+          code = 4;
+          break;
+        case Schachfigurenart.DAME:
+          code = 5;
+          break;
+        case Schachfigurenart.KOENIG:
+          code = 6;
+          break;
+      }
+
+      return fig.istWeiss ? code : -code;
+    }
+
+    final StringBuffer buffer = StringBuffer();
+
+    buffer.writeln("static AiGameState $methodName() {");
+    buffer.writeln("  final board = List<int>.filled(64, 0);");
+    buffer.writeln("");
+    buffer.writeln("  final mapper = BoardCoordinateMapper(");
+    buffer.writeln("    figurenfarbe: ${position.playerColorWhite},");
+    buffer.writeln("  );");
+    buffer.writeln("");
+    buffer.writeln("  void put(int row, int col, int piece) {");
+    buffer.writeln("    board[mapper.guiToAiIndex(row, col)] = piece;");
+    buffer.writeln("  }");
+    buffer.writeln("");
+
+    for (int row = 0; row < 8; row++) {
+      for (int col = 0; col < 8; col++) {
+        final Schachfigur? fig = position.brett[row][col];
+
+        if (fig == null) continue;
+
+        buffer.writeln(
+          "  put($row, $col, ${pieceCode(fig)}); // ${fig.istWeiss ? "Weiß" : "Schwarz"} ${fig.art.name}",
+        );
+      }
+    }
+
+    buffer.writeln("");
+    buffer.writeln("  return AiGameState(");
+    buffer.writeln("    board: board,");
+    buffer.writeln("    isWhiteTurn: ${position.whiteToMove},");
+    buffer.writeln("    isEnemyMove: ${position.whiteToMove != position.playerColorWhite},");
+    buffer.writeln("    playerIsWhite: ${position.playerColorWhite},");
+    buffer.writeln("    enPassantTargetIndex: null,");
+    buffer.writeln("    castlingRights: noCastling(),");
+    buffer.writeln("  );");
+    buffer.writeln("}");
+
+    debugPrint("===== Testmethode für ${position.name} =====");
+    debugPrint(buffer.toString());
+    debugPrint("===== Ende Testmethode =====");
   }
 
   void _logJson(SavedPosition position) {
@@ -228,6 +316,11 @@ class _SavedPositionsPageState extends State<SavedPositionsPage> {
                     trailing: Wrap(
                       spacing: 4,
                       children: [
+                        IconButton(
+                          tooltip: "Testmethode loggen",
+                          icon: const Icon(Icons.science),
+                          onPressed: () => _logTestMethod(pos),
+                        ),
                         IconButton(
                           tooltip: "JSON loggen",
                           icon: const Icon(Icons.code),

@@ -12,6 +12,7 @@ import 'package:schach/helper/helper.dart';
 import 'package:schach/pages/spielauswahl.dart';
 import 'package:schach/values/colors.dart';
 import '../game/controller/computer_controller.dart';
+import '../game/history/match_recorder.dart';
 import '../game/logic/board_initializer.dart';
 import '../game/logic/game_end_checker.dart';
 import '../game/widgets/chess_board_widget.dart';
@@ -19,6 +20,7 @@ import '../logic/board_coordinate_mapper.dart';
 import '../game/models/game_state.dart';
 import '../game/logic/move_executor.dart';
 import '../game/logic/move_generator.dart';
+import '../services/match_history_storage_service.dart';
 
 class SpielBrett extends StatefulWidget {
   final bool figurenfarbe;
@@ -66,6 +68,9 @@ class _SpielBrettState extends State<SpielBrett> {
   bool _isDisposed = false;
   bool _stopComputerVsComputer = false;
 
+  late MatchRecorder matchRecorder;
+  bool matchSaved = false;
+
   @override
   void initState() {
     super.initState();
@@ -106,6 +111,8 @@ class _SpielBrettState extends State<SpielBrett> {
       logKi: GameLogger.ki,
     );
 
+    matchRecorder = MatchRecorder();
+
     startNewGame();
   }
 
@@ -135,6 +142,14 @@ class _SpielBrettState extends State<SpielBrett> {
     setState(() {
       _startSpielbrett();
     });
+
+    matchSaved = false;
+
+    matchRecorder.start(
+      playerColorWhite: figurenfarbe,
+      spielModus: spielModus,
+      initialBoard: gameState.brett,
+    );
 
     GameLogger.spiel("Brett initialisiert");
 
@@ -311,6 +326,11 @@ class _SpielBrettState extends State<SpielBrett> {
       promotionFigur: promotionFigur,
     );
 
+    matchRecorder.addMove(
+      move: gameState.moveHistory.last,
+      board: gameState.brett,
+    );
+
     setState(() {
       ausgewaehlteFigur = null;
       selectedRow = -1;
@@ -368,6 +388,13 @@ class _SpielBrettState extends State<SpielBrett> {
       return true;
     }
 
+    if (gameState.moveHistory.isNotEmpty) {
+      matchRecorder.addMove(
+        move: gameState.moveHistory.last,
+        board: gameState.brett,
+      );
+    }
+
     setState(() {});
 
     return await checkSpielEnde();
@@ -413,6 +440,8 @@ class _SpielBrettState extends State<SpielBrett> {
         text = figurenfarbe ? "Schwarz hat gewonnen!" : "Weiß hat gewonnen!";
       }
 
+      await _saveMatchIfNeeded(text);
+
       await _showGameEndDialog(
         spielende: Spielende.SCHACHMATT,
         text: text,
@@ -427,6 +456,8 @@ class _SpielBrettState extends State<SpielBrett> {
       pause = false;
 
       if (!mounted) return true;
+
+      await _saveMatchIfNeeded("Unentschieden durch Patt!");
 
       await _showGameEndDialog(
         spielende: Spielende.REMIS,
@@ -443,6 +474,8 @@ class _SpielBrettState extends State<SpielBrett> {
 
       if (!mounted) return true;
 
+      await _saveMatchIfNeeded("Unentschieden durch Figurenmangel!");
+
       await _showGameEndDialog(
         spielende: Spielende.REMIS,
         text: "Unentschieden durch Figurenmangel!",
@@ -452,6 +485,9 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
     if (gameEndChecker.isFiftyMoveRule(gameState)) {
+
+      await _saveMatchIfNeeded("Unentschieden durch 50-Züge-Regel!");
+
       await _showGameEndDialog(
         spielende: Spielende.REMIS,
         text: "Unentschieden durch 50-Züge-Regel!",
@@ -461,6 +497,9 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
     if (gameEndChecker.isThreefoldRepetition(gameState)) {
+
+      await _saveMatchIfNeeded("Unentschieden durch dreifache Stellungswiederholung!");
+
       await _showGameEndDialog(
         spielende: Spielende.REMIS,
         text: "Unentschieden durch dreifache Stellungswiederholung!",
@@ -482,6 +521,18 @@ class _SpielBrettState extends State<SpielBrett> {
     }
 
     return false;
+  }
+
+  Future<void> _saveMatchIfNeeded(String resultText) async {
+    if (matchSaved) return;
+
+    matchSaved = true;
+
+    final entry = matchRecorder.createEntry(
+      resultText: resultText,
+    );
+
+    await MatchHistoryStorageService.saveMatch(entry);
   }
 
   Future<void> _showGameEndDialog({
@@ -515,20 +566,29 @@ class _SpielBrettState extends State<SpielBrett> {
   }
 
   Future<void> _showExitDialog() async {
+    final BuildContext pageContext = context;
+
     await showDialog(
-      context: context,
-      builder: (BuildContext context) {
+      context: pageContext,
+      builder: (BuildContext dialogContext) {
         return DialogSpielabbruch(
           onTapNein: () {
-            Navigator.pop(context);
+            Navigator.pop(dialogContext);
           },
           onTapJa: () async {
             _stopComputerVsComputer = true;
 
-            Navigator.pop(context);
+            Navigator.pop(dialogContext);
 
-            await Navigator.pushReplacement(
-              context,
+            if (gameState.moveHistory.isNotEmpty) {
+              await _saveMatchIfNeeded(
+                "Abgebrochen (${gameState.isWhiteTurn ? "Weiß" : "Schwarz"} am Zug)",
+              );
+            }
+
+            if (!mounted) return;
+
+            await Navigator.of(pageContext).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => const SpielAuswahl(),
               ),

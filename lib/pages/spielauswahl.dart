@@ -9,6 +9,8 @@ import 'package:schach/pages/spielbrett.dart';
 import 'package:schach/pages/stellung_editor.dart';
 import 'package:schach/values/colors.dart';
 
+import 'match_history_page.dart';
+
 class SpielAuswahl extends StatefulWidget {
   const SpielAuswahl({super.key});
 
@@ -99,6 +101,15 @@ class _SpielAuswahlState extends State<SpielAuswahl> {
           customIsWhiteTurn: position.whiteToMove,
           customMoveInfos: position.moveInfos,
         ),
+      ),
+    );
+  }
+
+  Future<void> _openMatchHistory() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const MatchHistoryPage(),
       ),
     );
   }
@@ -292,6 +303,15 @@ class _SpielAuswahlState extends State<SpielAuswahl> {
                 icon: Icons.folder_open,
                 onPressed: _openSavedPositions,
               ),
+
+              const SizedBox(height: 10),
+
+              _buildSecondaryButton(
+                text: "Partiehistorie",
+                icon: Icons.history,
+                onPressed: _openMatchHistory,
+              ),
+
             ],
           ),
         ),
