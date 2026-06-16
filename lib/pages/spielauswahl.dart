@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:schach/components/Spielart.dart';
 import 'package:schach/components/Toast.dart';
 import 'package:schach/models/saved_position.dart';
-import 'package:schach/saved_positions_page.dart';
-import 'package:schach/spielbrett.dart';
-import 'package:schach/stellung_editor.dart';
+import 'package:schach/pages/saved_positions_page.dart';
+import 'package:schach/pages/spielbrett.dart';
+import 'package:schach/pages/stellung_editor.dart';
 import 'package:schach/values/colors.dart';
 
 class SpielAuswahl extends StatefulWidget {

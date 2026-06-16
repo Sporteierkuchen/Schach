@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:schach/models/saved_position.dart';
-import 'package:schach/services/position_storage_service.dart';
+import '../chess_ai/services/position_storage_service.dart';
 
 enum SavedPositionSortMode {
   newestFirst,

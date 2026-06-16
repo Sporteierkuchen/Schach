@@ -1,5 +1,5 @@
-import '../services/opening_book.dart';
-import '../services/opening_book_service.dart';
+import 'package:schach/chess_ai/services/opening_book.dart';
+import 'package:schach/chess_ai/services/opening_book_service.dart';
 import 'ai_game_state.dart';
 import 'ai_move.dart';
 import 'board_evaluator.dart';

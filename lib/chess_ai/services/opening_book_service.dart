@@ -1,10 +1,12 @@
 import 'dart:math';
 
-import '../chess_ai/ai_game_state.dart';
-import '../chess_ai/ai_move.dart';
-import '../chess_ai/board_helper.dart';
-import '../chess_ai/move_generator.dart';
-import '../chess_ai/move_ordering.dart';
+import 'package:schach/chess_ai/move_generator.dart';
+
+import '../ai_game_state.dart';
+import '../ai_move.dart';
+
+import '../board_helper.dart';
+import '../move_ordering.dart';
 import 'opening_book.dart';
 
 class OpeningBookService {

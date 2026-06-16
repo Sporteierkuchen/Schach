@@ -6,12 +6,11 @@ import 'package:schach/components/Toast.dart';
 import 'package:schach/logic/board_coordinate_mapper.dart';
 import 'package:schach/logic/position_validator.dart';
 import 'package:schach/models/saved_position.dart';
-import 'package:schach/saved_positions_page.dart';
-import 'package:schach/services/position_storage_service.dart';
-import 'package:schach/spielbrett.dart';
+import 'package:schach/pages/saved_positions_page.dart';
+import 'package:schach/pages/spielbrett.dart';
 import 'package:schach/values/colors.dart';
-
-import 'components/Move Infos.dart';
+import '../chess_ai/services/position_storage_service.dart';
+import '../components/Move Infos.dart';
 
 class StellungEditor extends StatefulWidget {
   const StellungEditor({super.key});

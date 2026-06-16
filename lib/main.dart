@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:schach/spielauswahl.dart';
+import 'package:schach/pages/spielauswahl.dart';
 
 void main() {
   runApp(const MyApp());
