@@ -18,8 +18,10 @@ class AiStateBuilder {
     required MoveInfos? moveInfos,
 
     required BoardCoordinateMapper mapper,
-  }) {
 
+    int halfmoveClock = 0,
+    List<int>? positionHistory,
+  }) {
     return AiGameState(
       board: List<int>.from(brettArray),
 
@@ -29,16 +31,18 @@ class AiStateBuilder {
 
       playerIsWhite: figurenfarbe,
 
-      enPassantTargetIndex:
-      _getEnPassantTargetIndex(
+      enPassantTargetIndex: _getEnPassantTargetIndex(
         moveInfos,
         mapper,
       ),
 
-      castlingRights:
-      _getCastlingRights(
+      castlingRights: _getCastlingRights(
         brett,
       ),
+
+      halfmoveClock: halfmoveClock,
+
+      positionHistory: positionHistory,
     );
   }
 

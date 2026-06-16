@@ -1,4 +1,5 @@
 import 'package:schach/chess_ai/board_helper.dart';
+import 'package:schach/chess_ai/zobrist_hasher.dart';
 
 class AiCastlingRights {
   final bool whiteKingSide;
@@ -38,6 +39,11 @@ class AiGameState {
   int? enPassantTargetIndex;
   AiCastlingRights castlingRights;
 
+  int zobristKey;
+
+  int halfmoveClock;
+  final List<int> positionHistory;
+
   AiGameState({
     required this.board,
     required this.isEnemyMove,
@@ -45,7 +51,17 @@ class AiGameState {
     required this.playerIsWhite,
     required this.enPassantTargetIndex,
     required this.castlingRights,
-  });
+    int? zobristKey,
+    this.halfmoveClock = 0,
+    List<int>? positionHistory,
+  })  : zobristKey = zobristKey ??
+      ZobristHasher.hashFromValues(
+        board: board,
+        isWhiteTurn: isWhiteTurn,
+        enPassantTargetIndex: enPassantTargetIndex,
+        castlingRights: castlingRights,
+      ),
+        positionHistory = positionHistory ?? [];
 
   int? get whiteKingIndex {
     final int whiteKingCode = playerIsWhite ? 6 : -6;

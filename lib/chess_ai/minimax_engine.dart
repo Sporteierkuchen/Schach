@@ -1,6 +1,4 @@
 import 'dart:math';
-
-import 'package:flutter/cupertino.dart';
 import 'package:schach/chess_ai/search_heuristics.dart';
 import 'package:schach/chess_ai/static_exchange_evaluator.dart';
 import 'ai_game_state.dart';
@@ -110,9 +108,10 @@ class MinimaxEngine {
         timeLimitMs: timeLimitMs,
       );
 
-      final bool isMateScore = score.abs() > mateScore - 10000;
+      bool isMateScore = score.abs() > mateScore - 10000;
 
       if (!isMateScore) {
+
         score += _rootSeeAdjustment(
           beforeBoard: beforeBoard,
           move: move,
@@ -140,6 +139,7 @@ class MinimaxEngine {
           afterState: state,
           aiIsWhite: aiIsWhite,
         );
+
       }
 
       _undoMoveInPlace(
@@ -219,6 +219,12 @@ class MinimaxEngine {
 
     searchedNodes++;
 
+    final int? drawScore = _drawScoreIfDraw(state);
+
+    if (drawScore != null) {
+      return drawScore;
+    }
+
     final int key = _buildTranspositionKey(state: state);
 
     final int originalAlpha = alpha;
@@ -229,7 +235,12 @@ class MinimaxEngine {
 
     final TranspositionEntry? entry = transpositionTable.get(key);
 
-    if (entry != null && entry.depth >= depth) {
+    final bool canUseEntry =
+        entry != null &&
+            entry.depth >= depth &&
+            entry.score.abs() <= mateScore - 10000;
+
+    if (canUseEntry) {
       if (entry.flag == TranspositionFlag.exact) {
         return entry.score;
       }
@@ -322,7 +333,7 @@ class MinimaxEngine {
 
     final List<AiMove> moves = _getOrderedMoves(
       state: state,
-      hashEntry: entry,
+      hashEntry: canUseEntry ? entry : null,
       ply: ply,
     );
 
@@ -355,6 +366,26 @@ class MinimaxEngine {
           state: state,
         );
 
+/*        final bool canFutilityPrune = _canApplyFutilityPruning(
+          state: state,
+          move: move,
+          depth: depth,
+          alpha: localAlpha,
+          beta: localBeta,
+          inCheck: inCheck,
+          wasCapture: wasCapture,
+          givesCheck: givesCheck,
+        );
+
+        if (canFutilityPrune) {
+          _undoMoveInPlace(
+            state: state,
+            undo: undo,
+          );
+
+          continue;
+        }*/
+
         final bool canReduce = _canApplyLmr(
           move: move,
           state: state,
@@ -366,7 +397,16 @@ class MinimaxEngine {
         );
 
         if (canReduce && !givesCheck) {
-          newDepth = depth - 2;
+          final int reduction = _lmrReduction(
+            depth: depth,
+            moveIndex: moveIndex,
+          );
+
+          newDepth = depth - 1 - reduction;
+
+          if (newDepth < 1) {
+            newDepth = 1;
+          }
         }
 
         if (givesCheck) {
@@ -450,6 +490,26 @@ class MinimaxEngine {
           state: state,
         );
 
+/*        final bool canFutilityPrune = _canApplyFutilityPruning(
+          state: state,
+          move: move,
+          depth: depth,
+          alpha: localAlpha,
+          beta: localBeta,
+          inCheck: inCheck,
+          wasCapture: wasCapture,
+          givesCheck: givesCheck,
+        );
+
+        if (canFutilityPrune) {
+          _undoMoveInPlace(
+            state: state,
+            undo: undo,
+          );
+
+          continue;
+        }*/
+
         final bool canReduce = _canApplyLmr(
           move: move,
           state: state,
@@ -461,7 +521,16 @@ class MinimaxEngine {
         );
 
         if (canReduce && !givesCheck) {
-          newDepth = depth - 2;
+          final int reduction = _lmrReduction(
+            depth: depth,
+            moveIndex: moveIndex,
+          );
+
+          newDepth = depth - 1 - reduction;
+
+          if (newDepth < 1) {
+            newDepth = 1;
+          }
         }
 
         if (givesCheck) {
@@ -531,7 +600,14 @@ class MinimaxEngine {
     required int beta,
     required int depth,
   }) {
+
     searchedNodes++;
+
+    final int? drawScore = _drawScoreIfDraw(state);
+
+    if (drawScore != null) {
+      return drawScore;
+    }
 
     final bool allowChecks = depth >= quiescenceDepth - 3;
 
@@ -668,7 +744,7 @@ class MinimaxEngine {
   int _buildTranspositionKey({
     required AiGameState state,
   }) {
-    return ZobristHasher.hash(state);
+    return state.zobristKey;
   }
 
 
@@ -1030,13 +1106,32 @@ class MinimaxEngine {
   }) {
     if (depth < 4) return false;
     if (moveIndex < 6) return false;
+
     if (inCheck) return false;
     if (givesCheck) return false;
     if (wasCapture) return false;
     if (move.promotionPiece != null) return false;
+
+    // Königszüge lieber nicht reduzieren:
+    // In Mattnetzen und Endspielen sind Königszüge oft erzwungen/taktisch.
     if (move.piece.abs() == 6) return false;
 
     return true;
+  }
+
+  int _lmrReduction({
+    required int depth,
+    required int moveIndex,
+  }) {
+    if (depth >= 8 && moveIndex >= 8) {
+      return 3;
+    }
+
+    if (depth >= 6 && moveIndex >= 5) {
+      return 2;
+    }
+
+    return 1;
   }
 
   bool _canApplyNullMovePruning({
@@ -1044,22 +1139,38 @@ class MinimaxEngine {
     required int depth,
     required bool inCheck,
   }) {
-    if (depth < 4) {
+    if (depth < 4) return false;
+    if (inCheck) return false;
+
+    final int pieces = state.board.where((p) => p != 0).length;
+
+    // Im Endspiel vorsichtig wegen Zugzwang.
+    if (pieces <= 10) return false;
+
+    // Wenn nur Könige + wenig Material vorhanden sind, kein Null Move.
+    if (moveGenerator.isInsufficientMaterial(state.board)) {
       return false;
     }
 
-    if (inCheck) {
+    // Bei Bauernendspielen ebenfalls kein Null Move.
+    if (_isPawnEndgame(state.board)) {
       return false;
     }
 
-    if (_isEndgameForNullMove(state.board)) {
-      return false;
-    }
+    return true;
+  }
 
-    if (!_sideHasNonPawnMaterial(
-      board: state.board,
-      white: state.isWhiteTurn,
-    )) {
+  bool _isPawnEndgame(List<int> board) {
+    for (final int piece in board) {
+      if (piece == 0) continue;
+
+      final int absPiece = piece.abs();
+
+      // König und Bauer sind okay.
+      if (absPiece == 6 || absPiece == 1) {
+        continue;
+      }
+
       return false;
     }
 
@@ -1189,6 +1300,83 @@ class MinimaxEngine {
     return pv.join(" ");
   }
 
+  bool _isFiftyMoveRule(AiGameState state) {
+    return state.halfmoveClock >= 100;
+  }
+
+  bool _isThreefoldRepetition(AiGameState state) {
+    int count = 1;
+
+    for (final int key in state.positionHistory) {
+      if (key == state.zobristKey) {
+        count++;
+      }
+    }
+
+    return count >= 3;
+  }
+
+  int? _drawScoreIfDraw(AiGameState state) {
+    if (_isFiftyMoveRule(state)) {
+      return 0;
+    }
+
+    if (moveGenerator.isInsufficientMaterial(state.board)) {
+      return 0;
+    }
+
+    if (_isThreefoldRepetition(state)) {
+      return _repetitionScore(state);
+    }
+
+    return null;
+  }
+
+  int _repetitionScore(AiGameState state) {
+    final int eval = evaluator.evaluate(state.board);
+
+    // Weiß steht klar besser und ist am Zug:
+    // Wiederholung ist aus weißer Sicht schlecht.
+    if (eval > 250) {
+      return state.isWhiteTurn ? -50 : 50;
+    }
+
+    // Schwarz steht klar besser:
+    // Wiederholung ist aus schwarzer Sicht schlecht.
+    if (eval < -250) {
+      return state.isWhiteTurn ? -50 : 50;
+    }
+
+    return 0;
+  }
+
+  bool _canApplyFutilityPruning({
+    required AiGameState state,
+    required AiMove move,
+    required int depth,
+    required int alpha,
+    required int beta,
+    required bool inCheck,
+    required bool wasCapture,
+    required bool givesCheck,
+  }) {
+    if (depth > 1) return false;
+    if (inCheck) return false;
+    if (givesCheck) return false;
+    if (wasCapture) return false;
+    if (move.promotionPiece != null) return false;
+
+    final int staticEval = evaluator.evaluate(state.board);
+
+    final int margin = depth == 1 ? 150 : 300;
+
+    if (state.isWhiteTurn) {
+      return staticEval + margin <= alpha;
+    } else {
+      return staticEval - margin >= beta;
+    }
+  }
+
   int perft({
     required AiGameState state,
     required int depth,
@@ -1242,6 +1430,10 @@ class MinimaxEngine {
   }) {
     final List<int> board = state.board;
 
+    final int oldZobristKey = state.zobristKey;
+    final int oldHalfmoveClock = state.halfmoveClock;
+    final int oldHistoryLength = state.positionHistory.length;
+
     final int movedPiece = board[move.fromIndex];
     final int capturedPiece = board[move.toIndex];
 
@@ -1250,8 +1442,11 @@ class MinimaxEngine {
     final int? oldEnPassantTargetIndex = state.enPassantTargetIndex;
     final AiCastlingRights oldCastlingRights = state.castlingRights;
 
-    // Wichtig: vor der Brettänderung berechnen,
-    // weil _updateCastlingRights() das geschlagene Zielfeld ausliest.
+    int newHash = state.zobristKey;
+
+    newHash ^= ZobristHasher.enPassantHash(oldEnPassantTargetIndex);
+    newHash ^= ZobristHasher.castlingHash(oldCastlingRights);
+
     final AiCastlingRights newCastlingRights = _updateCastlingRights(
       state: state,
       move: move,
@@ -1272,6 +1467,14 @@ class MinimaxEngine {
       movedPiece > 0 ? move.toIndex + 8 : move.toIndex - 8;
 
       enPassantCapturedPiece = board[enPassantCapturedIndex];
+
+      if (enPassantCapturedPiece != 0) {
+        newHash ^= ZobristHasher.pieceSquareKey(
+          enPassantCapturedPiece,
+          enPassantCapturedIndex,
+        );
+      }
+
       board[enPassantCapturedIndex] = 0;
     }
 
@@ -1286,8 +1489,18 @@ class MinimaxEngine {
     int? rookTo;
     int? rookPiece;
 
+    newHash ^= ZobristHasher.pieceSquareKey(movedPiece, move.fromIndex);
+
+    if (capturedPiece != 0) {
+      newHash ^= ZobristHasher.pieceSquareKey(capturedPiece, move.toIndex);
+    }
+
+    final int placedPiece = move.promotionPiece ?? movedPiece;
+
+    newHash ^= ZobristHasher.pieceSquareKey(placedPiece, move.toIndex);
+
     board[move.fromIndex] = 0;
-    board[move.toIndex] = move.promotionPiece ?? movedPiece;
+    board[move.toIndex] = placedPiece;
 
     if (isCastleMove) {
       final int row = BoardHelper.getRow(move.fromIndex);
@@ -1304,18 +1517,39 @@ class MinimaxEngine {
 
       rookPiece = board[rookFrom];
 
-      board[rookTo] = board[rookFrom];
+      if (rookPiece != 0) {
+        newHash ^= ZobristHasher.pieceSquareKey(rookPiece, rookFrom);
+        newHash ^= ZobristHasher.pieceSquareKey(rookPiece, rookTo);
+      }
+
+      board[rookTo] = rookPiece;
       board[rookFrom] = 0;
     }
 
-    state.enPassantTargetIndex = _calculateNextEnPassantTarget(
+    final int? newEnPassantTargetIndex = _calculateNextEnPassantTarget(
       move: move,
     );
 
-    state.castlingRights = newCastlingRights;
+    newHash ^= ZobristHasher.enPassantHash(newEnPassantTargetIndex);
+    newHash ^= ZobristHasher.castlingHash(newCastlingRights);
+    newHash ^= ZobristHasher.whiteTurnKey;
 
+    state.enPassantTargetIndex = newEnPassantTargetIndex;
+    state.castlingRights = newCastlingRights;
     state.isWhiteTurn = !state.isWhiteTurn;
     state.isEnemyMove = !state.isEnemyMove;
+    state.zobristKey = newHash;
+
+    final bool isPawnMove = movedPiece.abs() == 1;
+    final bool isCapture = capturedPiece != 0 || isEnPassantMove;
+
+    if (isPawnMove || isCapture) {
+      state.halfmoveClock = 0;
+    } else {
+      state.halfmoveClock++;
+    }
+
+    state.positionHistory.add(state.zobristKey);
 
     return MoveUndo(
       fromIndex: move.fromIndex,
@@ -1326,6 +1560,9 @@ class MinimaxEngine {
       oldIsEnemyMove: oldIsEnemyMove,
       oldEnPassantTargetIndex: oldEnPassantTargetIndex,
       oldCastlingRights: oldCastlingRights,
+      oldZobristKey: oldZobristKey,
+      oldHalfmoveClock: oldHalfmoveClock,
+      oldHistoryLength: oldHistoryLength,
       wasEnPassant: isEnPassantMove,
       enPassantCapturedIndex: enPassantCapturedIndex,
       enPassantCapturedPiece: enPassantCapturedPiece,
@@ -1346,6 +1583,12 @@ class MinimaxEngine {
     state.isEnemyMove = undo.oldIsEnemyMove;
     state.enPassantTargetIndex = undo.oldEnPassantTargetIndex;
     state.castlingRights = undo.oldCastlingRights;
+    state.zobristKey = undo.oldZobristKey;
+    state.halfmoveClock = undo.oldHalfmoveClock;
+
+    while (state.positionHistory.length > undo.oldHistoryLength) {
+      state.positionHistory.removeLast();
+    }
 
     if (undo.wasCastle) {
       board[undo.rookFrom!] = undo.rookPiece!;
@@ -1436,6 +1679,9 @@ class MoveUndo {
   final bool oldIsEnemyMove;
   final int? oldEnPassantTargetIndex;
   final AiCastlingRights oldCastlingRights;
+  final int oldZobristKey;
+  final int oldHalfmoveClock;
+  final int oldHistoryLength;
 
   final bool wasEnPassant;
   final int? enPassantCapturedIndex;
@@ -1455,6 +1701,9 @@ class MoveUndo {
     required this.oldIsEnemyMove,
     required this.oldEnPassantTargetIndex,
     required this.oldCastlingRights,
+    required this.oldZobristKey,
+    required this.oldHalfmoveClock,
+    required this.oldHistoryLength,
     required this.wasEnPassant,
     this.enPassantCapturedIndex,
     this.enPassantCapturedPiece,

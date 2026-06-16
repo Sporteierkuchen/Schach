@@ -8,6 +8,7 @@ import 'package:schach/chess_ai/move_generator.dart';
 import 'package:schach/chess_ai/move_ordering.dart';
 import 'package:schach/chess_ai/test/test_positions.dart';
 import 'package:schach/chess_ai/transposition_table.dart';
+import 'package:schach/chess_ai/zobrist_hasher.dart';
 
 void main() {
   MinimaxEngine createEngine() {
@@ -32,11 +33,13 @@ void main() {
     required bool originalIsEnemyMove,
     required int? originalEnPassant,
     required AiCastlingRights originalCastlingRights,
+    required int originalZobristKey,
   }) {
     expect(state.board, originalBoard);
     expect(state.isWhiteTurn, originalIsWhiteTurn);
     expect(state.isEnemyMove, originalIsEnemyMove);
     expect(state.enPassantTargetIndex, originalEnPassant);
+    expect(state.zobristKey, originalZobristKey);
 
     expect(state.castlingRights.whiteKingSide,
         originalCastlingRights.whiteKingSide);
@@ -57,10 +60,11 @@ void main() {
     final originalIsEnemyMove = state.isEnemyMove;
     final originalEnPassant = state.enPassantTargetIndex;
     final originalCastling = state.castlingRights;
+    final originalZobristKey = state.zobristKey;
 
     final move = AiMove(
-      fromIndex: BoardHelper.getIndex(6, 4), // e2
-      toIndex: BoardHelper.getIndex(4, 4),   // e4
+      fromIndex: BoardHelper.getIndex(6, 4),
+      toIndex: BoardHelper.getIndex(4, 4),
       piece: 1,
       score: 0,
     );
@@ -73,7 +77,9 @@ void main() {
     expect(state.board[BoardHelper.getIndex(6, 4)], 0);
     expect(state.board[BoardHelper.getIndex(4, 4)], 1);
     expect(state.isWhiteTurn, false);
-    expect(state.enPassantTargetIndex, BoardHelper.getIndex(5, 4)); // e3
+    expect(state.enPassantTargetIndex, BoardHelper.getIndex(5, 4));
+    expect(state.zobristKey, isNot(originalZobristKey));
+    expect(state.zobristKey, ZobristHasher.hash(state));
 
     engine.undoMoveInPlaceForTest(
       state: state,
@@ -87,6 +93,7 @@ void main() {
       originalIsEnemyMove: originalIsEnemyMove,
       originalEnPassant: originalEnPassant,
       originalCastlingRights: originalCastling,
+      originalZobristKey: originalZobristKey,
     );
   });
 
@@ -99,10 +106,11 @@ void main() {
     final originalIsEnemyMove = state.isEnemyMove;
     final originalEnPassant = state.enPassantTargetIndex;
     final originalCastling = state.castlingRights;
+    final originalZobristKey = state.zobristKey;
 
     final move = AiMove(
-      fromIndex: BoardHelper.getIndex(3, 4), // e5
-      toIndex: BoardHelper.getIndex(2, 3),   // d6
+      fromIndex: BoardHelper.getIndex(3, 4),
+      toIndex: BoardHelper.getIndex(2, 3),
       piece: 1,
       score: 0,
     );
@@ -115,6 +123,8 @@ void main() {
     expect(state.board[BoardHelper.getIndex(3, 4)], 0);
     expect(state.board[BoardHelper.getIndex(3, 3)], 0);
     expect(state.board[BoardHelper.getIndex(2, 3)], 1);
+    expect(state.zobristKey, isNot(originalZobristKey));
+    expect(state.zobristKey, ZobristHasher.hash(state));
 
     engine.undoMoveInPlaceForTest(
       state: state,
@@ -128,6 +138,7 @@ void main() {
       originalIsEnemyMove: originalIsEnemyMove,
       originalEnPassant: originalEnPassant,
       originalCastlingRights: originalCastling,
+      originalZobristKey: originalZobristKey,
     );
   });
 
@@ -140,10 +151,11 @@ void main() {
     final originalIsEnemyMove = state.isEnemyMove;
     final originalEnPassant = state.enPassantTargetIndex;
     final originalCastling = state.castlingRights;
+    final originalZobristKey = state.zobristKey;
 
     final move = AiMove(
-      fromIndex: BoardHelper.getIndex(1, 0), // a7
-      toIndex: BoardHelper.getIndex(0, 0),   // a8
+      fromIndex: BoardHelper.getIndex(1, 0),
+      toIndex: BoardHelper.getIndex(0, 0),
       piece: 1,
       promotionPiece: 5,
       score: 0,
@@ -156,6 +168,8 @@ void main() {
 
     expect(state.board[BoardHelper.getIndex(1, 0)], 0);
     expect(state.board[BoardHelper.getIndex(0, 0)], 5);
+    expect(state.zobristKey, isNot(originalZobristKey));
+    expect(state.zobristKey, ZobristHasher.hash(state));
 
     engine.undoMoveInPlaceForTest(
       state: state,
@@ -169,6 +183,7 @@ void main() {
       originalIsEnemyMove: originalIsEnemyMove,
       originalEnPassant: originalEnPassant,
       originalCastlingRights: originalCastling,
+      originalZobristKey: originalZobristKey,
     );
   });
 
@@ -181,10 +196,11 @@ void main() {
     final originalIsEnemyMove = state.isEnemyMove;
     final originalEnPassant = state.enPassantTargetIndex;
     final originalCastling = state.castlingRights;
+    final originalZobristKey = state.zobristKey;
 
     final move = AiMove(
-      fromIndex: BoardHelper.getIndex(7, 4), // e1
-      toIndex: BoardHelper.getIndex(7, 6),   // g1
+      fromIndex: BoardHelper.getIndex(7, 4),
+      toIndex: BoardHelper.getIndex(7, 6),
       piece: 6,
       score: 0,
     );
@@ -198,6 +214,8 @@ void main() {
     expect(state.board[BoardHelper.getIndex(7, 6)], 6);
     expect(state.board[BoardHelper.getIndex(7, 7)], 0);
     expect(state.board[BoardHelper.getIndex(7, 5)], 4);
+    expect(state.zobristKey, isNot(originalZobristKey));
+    expect(state.zobristKey, ZobristHasher.hash(state));
 
     engine.undoMoveInPlaceForTest(
       state: state,
@@ -211,6 +229,7 @@ void main() {
       originalIsEnemyMove: originalIsEnemyMove,
       originalEnPassant: originalEnPassant,
       originalCastlingRights: originalCastling,
+      originalZobristKey: originalZobristKey,
     );
   });
 
@@ -218,20 +237,20 @@ void main() {
     final engine = createEngine();
     final state = TestPositions.startPosition();
 
-    final originalBoard = copyBoard(state.board);
+    state.board[BoardHelper.getIndex(7, 5)] = 0;
+
+    state.zobristKey = ZobristHasher.hash(state);
+
+    final boardAfterSetup = copyBoard(state.board);
     final originalIsWhiteTurn = state.isWhiteTurn;
     final originalIsEnemyMove = state.isEnemyMove;
     final originalEnPassant = state.enPassantTargetIndex;
     final originalCastling = state.castlingRights;
-
-    // Brett etwas freimachen, damit König theoretisch ziehen kann.
-    state.board[BoardHelper.getIndex(7, 5)] = 0;
-
-    final boardAfterSetup = copyBoard(state.board);
+    final originalZobristKey = state.zobristKey;
 
     final move = AiMove(
-      fromIndex: BoardHelper.getIndex(7, 4), // e1
-      toIndex: BoardHelper.getIndex(7, 5),   // f1
+      fromIndex: BoardHelper.getIndex(7, 4),
+      toIndex: BoardHelper.getIndex(7, 5),
       piece: 6,
       score: 0,
     );
@@ -243,26 +262,107 @@ void main() {
 
     expect(state.castlingRights.whiteKingSide, false);
     expect(state.castlingRights.whiteQueenSide, false);
+    expect(state.zobristKey, isNot(originalZobristKey));
+    expect(state.zobristKey, ZobristHasher.hash(state));
 
     engine.undoMoveInPlaceForTest(
       state: state,
       undo: undo,
     );
 
-    expect(state.board, boardAfterSetup);
-    expect(state.isWhiteTurn, originalIsWhiteTurn);
-    expect(state.isEnemyMove, originalIsEnemyMove);
-    expect(state.enPassantTargetIndex, originalEnPassant);
-    expect(state.castlingRights.whiteKingSide,
-        originalCastling.whiteKingSide);
-    expect(state.castlingRights.whiteQueenSide,
-        originalCastling.whiteQueenSide);
-    expect(state.castlingRights.blackKingSide,
-        originalCastling.blackKingSide);
-    expect(state.castlingRights.blackQueenSide,
-        originalCastling.blackQueenSide);
-
-    // optional: ursprüngliches Brett wieder auf echten Start zurücksetzen
-    state.board.setAll(0, originalBoard);
+    expectStateRestored(
+      state: state,
+      originalBoard: boardAfterSetup,
+      originalIsWhiteTurn: originalIsWhiteTurn,
+      originalIsEnemyMove: originalIsEnemyMove,
+      originalEnPassant: originalEnPassant,
+      originalCastlingRights: originalCastling,
+      originalZobristKey: originalZobristKey,
+    );
   });
+
+  test('MakeUndo stellt Zobrist-Key bei En Passant wieder her', () {
+    final engine = createEngine();
+    final state = TestPositions.enPassantWhiteCanCapture();
+
+    final originalKey = state.zobristKey;
+    final originalBoard = List<int>.from(state.board);
+
+    final move = AiMove(
+      fromIndex: BoardHelper.getIndex(3, 4),
+      toIndex: BoardHelper.getIndex(2, 3),
+      piece: 1,
+      score: 0,
+    );
+
+    final undo = engine.makeMoveInPlaceForTest(
+      state: state,
+      move: move,
+    );
+
+    expect(state.zobristKey, isNot(originalKey));
+
+    engine.undoMoveInPlaceForTest(
+      state: state,
+      undo: undo,
+    );
+
+    expect(state.zobristKey, originalKey);
+    expect(state.board, originalBoard);
+  });
+
+  test('Zobrist bleibt nach mehreren MakeUndo-Zügen exakt gleich', () {
+    final engine = createEngine();
+    final state = TestPositions.startPosition();
+
+    final originalBoard = copyBoard(state.board);
+    final originalKey = state.zobristKey;
+
+    final moves = [
+      AiMove(
+        fromIndex: BoardHelper.getIndex(6, 4),
+        toIndex: BoardHelper.getIndex(4, 4),
+        piece: 1,
+        score: 0,
+      ),
+      AiMove(
+        fromIndex: BoardHelper.getIndex(1, 4),
+        toIndex: BoardHelper.getIndex(3, 4),
+        piece: -1,
+        score: 0,
+      ),
+      AiMove(
+        fromIndex: BoardHelper.getIndex(7, 6),
+        toIndex: BoardHelper.getIndex(5, 5),
+        piece: 2,
+        score: 0,
+      ),
+    ];
+
+    final undoStack = <MoveUndo>[];
+
+    for (final move in moves) {
+      final undo = engine.makeMoveInPlaceForTest(
+        state: state,
+        move: move,
+      );
+
+      undoStack.add(undo);
+
+      expect(state.zobristKey, ZobristHasher.hash(state));
+    }
+
+    for (int i = undoStack.length - 1; i >= 0; i--) {
+      engine.undoMoveInPlaceForTest(
+        state: state,
+        undo: undoStack[i],
+      );
+
+      expect(state.zobristKey, ZobristHasher.hash(state));
+    }
+
+    expect(state.board, originalBoard);
+    expect(state.zobristKey, originalKey);
+  });
+
 }

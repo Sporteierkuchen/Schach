@@ -64,6 +64,9 @@ class _SpielBrettState extends State<SpielBrett> {
   MoveInfos? moveInfos;
   List<String> moveHistory = [];
 
+  List<int> positionHistoryKeys = [];
+  int halfmoveClock = 0;
+
   late List<int> whiteKingPosition;
   late List<int> blackKingPosition;
 
@@ -100,6 +103,14 @@ class _SpielBrettState extends State<SpielBrett> {
     startNewGame();
   }
 
+  bool _isComputerTurn() {
+    if (spielModus != 0) return false;
+
+    // Spielerfarbe == Farbe am Zug => Spieler ist dran
+    // Spielerfarbe != Farbe am Zug => Computer ist dran
+    return isWhiteTurn != figurenfarbe;
+  }
+
   Future<void> startNewGame() async {
     logSpiel(
         "Neues Spiel gestartet | Farbe=${figurenfarbe ? "Weiß" : "Schwarz"} | Modus=$spielModus");
@@ -110,12 +121,14 @@ class _SpielBrettState extends State<SpielBrett> {
 
     logSpiel("Brett initialisiert");
 
-    if (!figurenfarbe && spielModus == 0) {
-      logKi("Spieler Schwarz -> KI beginnt");
+    if (spielModus == 0 && _isComputerTurn()) {
+      logKi("KI beginnt, weil Computer am Zug ist");
 
-      await computerMove();
+      final bool gameEnded = await computerMove();
 
-      isWhiteTurn = !isWhiteTurn;
+      if (!gameEnded) {
+        isWhiteTurn = !isWhiteTurn;
+      }
     }
 
     if (spielModus == -1) {
@@ -163,6 +176,8 @@ class _SpielBrettState extends State<SpielBrett> {
     isWhiteTurn = true;
     moveInfos = widget.customMoveInfos;
     moveHistory.clear();
+    positionHistoryKeys.clear();
+    halfmoveClock = 0;
 
     ausgewaehlteFigur = null;
     selectedRow = -1;
@@ -387,25 +402,31 @@ class _SpielBrettState extends State<SpielBrett> {
   Future<void> bewegeFigur(int newRow, int newCol) async {
     if (ausgewaehlteFigur == null) return;
 
-    final Schachfigur figur = ausgewaehlteFigur!;
+    Schachfigur figur = ausgewaehlteFigur!;
 
-    logSpiel("Spielerzug: "
-        "$figur "
-        "${mapper.koordinatenAnzeige(selectedRow, selectedColumn)}"
-        " -> "
-        "${mapper.koordinatenAnzeige(newRow, newCol)}");
+    logSpiel(
+      "Spielerzug: "
+          "$figur "
+          "${mapper.koordinatenAnzeige(selectedRow, selectedColumn)}"
+          " -> "
+          "${mapper.koordinatenAnzeige(newRow, newCol)}",
+    );
 
-    final int fromIndex =
-    mapper.guiToAiIndex(
+    final int fromIndex = mapper.guiToAiIndex(
       selectedRow,
       selectedColumn,
     );
 
-    final int toIndex =
-    mapper.guiToAiIndex(
+    final int toIndex = mapper.guiToAiIndex(
       newRow,
       newCol,
     );
+
+    final bool wasCapture = brett[newRow][newCol] != null;
+
+    int movedPieceCode = figur.istWeiss
+        ? _figurCode(figur.art)
+        : -_figurCode(figur.art);
 
     moveHistory.add(
       createUciMove(
@@ -414,10 +435,7 @@ class _SpielBrettState extends State<SpielBrett> {
       ),
     );
 
-    logSpiel(
-      "History: "
-          "${moveHistory.last}",
-    );
+    logSpiel("History: ${moveHistory.last}");
 
     figurGeschlagenPruefung(newRow, newCol);
 
@@ -457,10 +475,13 @@ class _SpielBrettState extends State<SpielBrett> {
 
         if (neueFigur != null) {
           ausgewaehlteFigur = neueFigur;
+          figur = neueFigur!;
+          movedPieceCode = figur.istWeiss
+              ? _figurCode(figur.art)
+              : -_figurCode(figur.art);
         }
 
-        logSpiel("Bauer umgewandelt zu "
-            "${neueFigur.toString()}");
+        logSpiel("Bauer umgewandelt zu ${neueFigur.toString()}");
       }
     }
 
@@ -486,6 +507,11 @@ class _SpielBrettState extends State<SpielBrett> {
       brettArray: brettArray,
       brett: brett,
       mapper: mapper,
+    );
+
+    _updateDrawHistoryAfterMove(
+      movedPieceCode: movedPieceCode,
+      wasCapture: wasCapture,
     );
 
     logSpiel("Brett aktualisiert");
@@ -1666,6 +1692,38 @@ class _SpielBrettState extends State<SpielBrett> {
     return false;
   }
 
+  void _updateDrawHistoryAfterMove({
+    required int movedPieceCode,
+    required bool wasCapture,
+  }) {
+    if (movedPieceCode.abs() == 1 || wasCapture) {
+      halfmoveClock = 0;
+    } else {
+      halfmoveClock++;
+    }
+
+    final AiGameState currentState = AiStateBuilder.buildAiGameState(
+      brettArray: brettArray,
+      brett: brett,
+      enemyMove: true,
+      isWhiteTurn: isWhiteTurn,
+      figurenfarbe: figurenfarbe,
+      moveInfos: moveInfos,
+      mapper: mapper,
+      halfmoveClock: halfmoveClock,
+      positionHistory: List<int>.from(positionHistoryKeys),
+    );
+
+    positionHistoryKeys.add(currentState.zobristKey);
+
+    logKi(
+      "DrawHistory aktualisiert | "
+          "Keys=${positionHistoryKeys.length} | "
+          "HalfmoveClock=$halfmoveClock | "
+          "Key=${currentState.zobristKey}",
+    );
+  }
+
   //--------------------------------------------------------------------------------------
 
   Future<bool> computerMove({bool? enemyMove}) async {
@@ -1686,7 +1744,14 @@ class _SpielBrettState extends State<SpielBrett> {
       figurenfarbe: figurenfarbe,
       moveInfos: moveInfos,
       mapper: mapper,
+      halfmoveClock: halfmoveClock,
+      positionHistory: List<int>.from(positionHistoryKeys),
     );
+
+/*    logKi("AI Board: ${aiState.board.join(',')}");
+    logKi("AI Key: ${aiState.zobristKey}");
+    logKi("AI Turn: ${aiState.isWhiteTurn}");
+    logKi("AI HistoryKeys: ${aiState.positionHistory.length}");*/
 
     logKi("AI State: ${aiState.debugString}");
 
@@ -1715,8 +1780,8 @@ class _SpielBrettState extends State<SpielBrett> {
 
     logKi(
       "Vorgeschlagener KI Zug: "
-      "${mapper.koordinatenAnzeige(fromRow, fromCol)} -> "
-      "${mapper.koordinatenAnzeige(toRow, toCol)}",
+          "${mapper.koordinatenAnzeige(fromRow, fromCol)} -> "
+          "${mapper.koordinatenAnzeige(toRow, toCol)}",
     );
 
     Schachfigur? figur = brett[fromRow][fromCol];
@@ -1761,9 +1826,7 @@ class _SpielBrettState extends State<SpielBrett> {
       ),
     );
 
-    logKi(
-      "History KI: ${moveHistory.last}",
-    );
+    logKi("History KI: ${moveHistory.last}");
 
     await warten(
       spielModus == -1
@@ -1776,12 +1839,15 @@ class _SpielBrettState extends State<SpielBrett> {
       return true;
     }
 
+    final bool wasCapture = brett[toRow][toCol] != null;
+    final int movedPieceCode = aiMove.promotionPiece ?? aiMove.piece;
+
     figurGeschlagenPruefung(toRow, toCol);
 
     logKi(
       "Computer bewegt: ${figur.toString()} von "
-      "${mapper.koordinatenAnzeige(fromRow, fromCol)} zu "
-      "${mapper.koordinatenAnzeige(toRow, toCol)}",
+          "${mapper.koordinatenAnzeige(fromRow, fromCol)} zu "
+          "${mapper.koordinatenAnzeige(toRow, toCol)}",
     );
 
     if (figur.art == Schachfigurenart.KOENIG) {
@@ -1831,6 +1897,11 @@ class _SpielBrettState extends State<SpielBrett> {
       brettArray: brettArray,
       brett: brett,
       mapper: mapper,
+    );
+
+    _updateDrawHistoryAfterMove(
+      movedPieceCode: movedPieceCode,
+      wasCapture: wasCapture,
     );
 
     logKi("KI Brett aktualisiert");

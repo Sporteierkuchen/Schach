@@ -1,5 +1,7 @@
 import 'package:schach/chess_ai/ai_game_state.dart';
 import 'package:schach/chess_ai/board_helper.dart';
+import 'package:schach/logic/board_coordinate_mapper.dart';
+
 
 class TestPositions {
   static AiCastlingRights noCastling() {
@@ -38,6 +40,160 @@ class TestPositions {
       castlingRights: noCastling(),
     );
   }
+
+  static AiGameState mateInThreeWhite1() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(0, 5)] = 5;
+
+    board[BoardHelper.getIndex(2, 0)] = 3;
+    board[BoardHelper.getIndex(2, 5)] = 1;
+
+    board[BoardHelper.getIndex(3, 3)] = -6;
+    board[BoardHelper.getIndex(3, 6)] = 1;
+
+    board[BoardHelper.getIndex(4, 5)] = -1;
+
+    board[BoardHelper.getIndex(5, 0)] = 1;
+    board[BoardHelper.getIndex(5, 5)] = 2;
+    board[BoardHelper.getIndex(5, 7)] = 1;
+
+    board[BoardHelper.getIndex(7, 0)] = 6;
+
+    return AiGameState(
+      board: board,
+      isEnemyMove: false,
+      isWhiteTurn: true,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+
+  }
+
+  static AiGameState mateInThreeWhite2() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(0, 0)] = 2;
+
+    board[BoardHelper.getIndex(1, 0)] = -1;
+    board[BoardHelper.getIndex(1, 6)] = 5;
+    board[BoardHelper.getIndex(1, 7)] = -2;
+
+    board[BoardHelper.getIndex(2, 4)] = -6;
+    board[BoardHelper.getIndex(2, 7)] = 3;
+
+    board[BoardHelper.getIndex(3, 2)] = 1;
+    board[BoardHelper.getIndex(3, 6)] = -1;
+
+    board[BoardHelper.getIndex(4, 1)] = 1;
+    board[BoardHelper.getIndex(4, 7)] = -1;
+
+    board[BoardHelper.getIndex(5, 2)] = 2;
+    board[BoardHelper.getIndex(5, 5)] = 1;
+
+    board[BoardHelper.getIndex(6, 0)] = 6;
+    board[BoardHelper.getIndex(6, 3)] = 1;
+    board[BoardHelper.getIndex(6, 6)] = 1;
+
+    return AiGameState(
+      board: board,
+      isEnemyMove: false,
+      isWhiteTurn: true,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+
+  }
+
+
+  static AiGameState mateInFourBlack() {
+    final board = List<int>.filled(64, 0);
+
+    final mapper = BoardCoordinateMapper(
+      figurenfarbe: false, // gespeicherte Stellung aus Sicht Schwarz
+    );
+
+    void put(int row, int col, int piece) {
+      board[mapper.guiToAiIndex(row, col)] = piece;
+    }
+
+    // Weiß
+    put(0, 0, 6); // Weißer König
+    put(0, 2, 4); // Weißer Turm
+    put(0, 3, 4); // Weißer Turm
+    put(0, 5, 5); // Weiße Dame
+    put(0, 7, 3); // Weißer Läufer
+    put(1, 1, 1); // Weißer Bauer
+    put(2, 6, 1); // Weißer Bauer
+    put(3, 2, 2); // Weißer Springer
+    put(3, 3, 3); // Weißer Läufer
+    put(3, 7, 1); // Weißer Bauer
+
+    // Schwarz
+    put(2, 2, -2); // Schwarzer Springer
+    put(3, 1, -2); // Schwarzer Springer
+    put(3, 4, -1); // Schwarzer Bauer
+    put(4, 7, -1); // Schwarzer Bauer
+    put(5, 1, -1); // Schwarzer Bauer
+    put(5, 5, -1); // Schwarzer Bauer
+    put(6, 0, -1); // Schwarzer Bauer
+    put(6, 1, -3); // Schwarzer Läufer
+    put(6, 2, -4); // Schwarzer Turm
+    put(6, 6, -1); // Schwarzer Bauer
+    put(7, 0, -6); // Schwarzer König
+    put(7, 3, -4); // Schwarzer Turm
+    put(7, 4, -5); // Schwarze Dame
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: false,
+      isEnemyMove: false,
+      playerIsWhite: false,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
+  static AiGameState smotheredMateInFiveBlack() {
+    final board = List<int>.filled(64, 0);
+
+    final mapper = BoardCoordinateMapper(
+      figurenfarbe: false, // gespeicherte Stellung aus Sicht Schwarz
+    );
+
+    void put(int row, int col, int piece) {
+      board[mapper.guiToAiIndex(row, col)] = piece;
+    }
+
+    // Weiß
+    put(0, 5, 4); // Weißer Turm
+    put(0, 6, 6); // Weißer König
+
+    put(1, 6, 1); // Weißer Bauer
+    put(1, 7, 1); // Weißer Bauer
+
+    // Schwarz
+    put(3, 6, -2); // Schwarzer Springer
+
+    put(6, 1, -5); // Schwarze Dame
+    put(7, 1, -6); // Schwarzer König
+
+
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: false,
+      isEnemyMove: false,
+      playerIsWhite: false,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
 
   static AiGameState whiteCanCastleKingSide() {
     final board = List<int>.filled(64, 0);

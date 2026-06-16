@@ -158,7 +158,7 @@ class _SavedPositionsPageState extends State<SavedPositionsPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: DropdownButtonFormField<SavedPositionSortMode>(
-                    value: sortMode,
+                    initialValue: sortMode,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       isDense: true,

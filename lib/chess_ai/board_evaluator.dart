@@ -8,22 +8,280 @@ class BoardEvaluator {
 
     final bool endgame = _isEndgame(board);
 
+    // Material + Positionsbewertung + Mobilität
     for (int i = 0; i < 64; i++) {
       final int piece = board[i];
-      if (piece == 0) continue;
+
+      if (piece == 0) {
+        continue;
+      }
 
       score += pieceValue(piece);
-      score += positionalBonus(piece, i, endgame);
-      score += mobilityBonus(board, piece, i);
+      score += positionalBonus(
+        piece,
+        i,
+        endgame,
+      );
+      score += mobilityBonus(
+        board,
+        piece,
+        i,
+      );
     }
 
+    // Bauernstruktur
     score += pawnStructureScore(board);
-    score += kingSafetyScore(board, endgame);
+
+    // Königssicherheit (Mittelspiel)
+    score += kingSafetyScore(
+      board,
+      endgame,
+    );
+
+    // Figuren die ungedeckt angegriffen sind
     score += hangingPieceScore(board);
-    score += developmentScore(board, endgame);
+
+    // Entwicklungsvorteile
+    score += developmentScore(
+      board,
+      endgame,
+    );
+
+    // Türme auf offenen Linien
     score += rookFileScore(board);
+
+    score += rookBehindPassedPawnScore(board);
+
+    // Läuferpaar
     score += bishopPairScore(board);
-    score += queenActivityScore(board, endgame);
+
+    // Damenaktivität
+    score += queenActivityScore(
+      board,
+      endgame,
+    );
+
+    // ===== Neue Endspiel-Heuristiken =====
+
+    // König ins Zentrum führen
+    score += endgameKingActivityScore(
+      board,
+      endgame,
+    );
+
+    // Gegnerischen König an den Rand drängen
+    score += endgameKingPressureScore(
+      board,
+      endgame,
+    );
+
+    return score;
+  }
+
+  int endgameKingActivityScore(
+      List<int> board,
+      bool endgame,
+      ) {
+    if (!endgame) {
+      return 0;
+    }
+
+    int score = 0;
+
+    final int? whiteKing = _findKing(board, true);
+    final int? blackKing = _findKing(board, false);
+
+    if (whiteKing == null || blackKing == null) {
+      return 0;
+    }
+
+    // Weiß möchte seinen König Richtung Zentrum bringen
+    score += _kingCenterBonus(whiteKing);
+
+    // Schwarz ebenfalls -> aus Weiß-Sicht negativ
+    score -= _kingCenterBonus(blackKing);
+
+    return score;
+  }
+
+  int rookBehindPassedPawnScore(List<int> board) {
+    int score = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece.abs() != 1) {
+        continue;
+      }
+
+      final bool whitePawn = piece > 0;
+
+      if (!_isPassedPawn(
+        board,
+        i,
+        whitePawn,
+      )) {
+        continue;
+      }
+
+      final int pawnRow = BoardHelper.getRow(i);
+      final int pawnCol = BoardHelper.getCol(i);
+
+      final int behindDirection = whitePawn ? 1 : -1;
+
+      for (
+      int row = pawnRow + behindDirection;
+      row >= 0 && row <= 7;
+      row += behindDirection
+      ) {
+        final int index = BoardHelper.getIndex(
+          row,
+          pawnCol,
+        );
+
+        final int target = board[index];
+
+        if (target == 0) {
+          continue;
+        }
+
+        if (target.abs() == 4) {
+          if ((target > 0) == whitePawn) {
+            score += whitePawn ? 35 : -35;
+          } else {
+            score += whitePawn ? -25 : 25;
+          }
+        }
+
+        break;
+      }
+    }
+
+    return score;
+  }
+
+  bool _isPassedPawn(
+      List<int> board,
+      int pawnIndex,
+      bool white,
+      ) {
+    final int enemyPawn = white ? -1 : 1;
+
+    final int row = BoardHelper.getRow(pawnIndex);
+    final int col = BoardHelper.getCol(pawnIndex);
+
+    for (
+    int r = white ? row - 1 : row + 1;
+    white ? r >= 0 : r <= 7;
+    r += white ? -1 : 1
+    ) {
+      for (int c = col - 1; c <= col + 1; c++) {
+        if (c < 0 || c > 7) {
+          continue;
+        }
+
+        final int index = BoardHelper.getIndex(
+          r,
+          c,
+        );
+
+        if (board[index] == enemyPawn) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  int _kingCenterBonus(int index) {
+    final int row = index ~/ 8;
+    final int col = index % 8;
+
+    final int distance = (row - 3).abs() + (col - 3).abs();
+
+    final int bonus = (6 - distance) * 8;
+
+    return bonus < 0 ? 0 : bonus;
+  }
+
+  int endgameKingPressureScore(
+      List<int> board,
+      bool endgame,
+      ) {
+    if (!endgame) {
+      return 0;
+    }
+
+    int score = 0;
+
+    final int? whiteKing = _findKing(board, true);
+    final int? blackKing = _findKing(board, false);
+
+    if (whiteKing == null || blackKing == null) {
+      return 0;
+    }
+
+    final int material = _materialOnly(board);
+
+    // Weiß hat deutlichen Materialvorteil
+    if (material > 500) {
+      score += _kingEdgeBonus(blackKing);
+      score += _kingDistanceBonus(
+        whiteKing,
+        blackKing,
+      );
+    }
+
+    // Schwarz hat deutlichen Materialvorteil
+    else if (material < -500) {
+      score -= _kingEdgeBonus(whiteKing);
+      score -= _kingDistanceBonus(
+        blackKing,
+        whiteKing,
+      );
+    }
+
+    return score;
+  }
+
+  int _kingEdgeBonus(int index) {
+    final int row = index ~/ 8;
+    final int col = index % 8;
+
+    final int distanceToEdge = [
+      row,
+      col,
+      7 - row,
+      7 - col,
+    ].reduce((a, b) => a < b ? a : b);
+
+    return (3 - distanceToEdge) * 20;
+  }
+
+  int _kingDistanceBonus(
+      int strongKing,
+      int weakKing,
+      ) {
+    final int sr = strongKing ~/ 8;
+    final int sc = strongKing % 8;
+
+    final int wr = weakKing ~/ 8;
+    final int wc = weakKing % 8;
+
+    final int distance =
+        (sr - wr).abs() +
+            (sc - wc).abs();
+
+    return (14 - distance) * 4;
+  }
+
+  int _materialOnly(List<int> board) {
+    int score = 0;
+
+    for (final int piece in board) {
+      score += pieceValue(piece);
+    }
 
     return score;
   }
@@ -575,24 +833,29 @@ class BoardEvaluator {
     final int pawn = white ? 1 : -1;
     final int enemyPawn = white ? -1 : 1;
 
+    final int? ownKing = _findKing(board, white);
+
     for (int i = 0; i < 64; i++) {
-      if (board[i] != pawn) continue;
+      if (board[i] != pawn) {
+        continue;
+      }
 
       final int row = BoardHelper.getRow(i);
       final int col = BoardHelper.getCol(i);
 
       bool blockedByEnemyPawn = false;
 
-      for (int r = white ? row - 1 : row + 1;
+      for (
+      int r = white ? row - 1 : row + 1;
       white ? r >= 0 : r <= 7;
-      r += white ? -1 : 1) {
+      r += white ? -1 : 1
+      ) {
         for (int c = col - 1; c <= col + 1; c++) {
-          if (c < 0 || c > 7) continue;
+          if (c < 0 || c > 7) {
+            continue;
+          }
 
-          final int index = BoardHelper.getIndex(
-            r,
-            c,
-          );
+          final int index = BoardHelper.getIndex(r, c);
 
           if (board[index] == enemyPawn) {
             blockedByEnemyPawn = true;
@@ -602,11 +865,202 @@ class BoardEvaluator {
 
       if (!blockedByEnemyPawn) {
         final int advance = white ? 6 - row : row - 1;
-        score += 20 + advance * 8;
+
+        int pawnScore = 25 + advance * advance * 6;
+
+        if (_isEndgame(board)) {
+          pawnScore += 20 + advance * 10;
+        }
+
+        if (_hasFriendlyPawnOnAdjacentFile(
+          board,
+          row,
+          col,
+          white,
+        )) {
+          pawnScore += 15;
+        }
+
+        if (_hasConnectedPassedPawn(
+          board,
+          row,
+          col,
+          white,
+        )) {
+          pawnScore += _isEndgame(board) ? 35 : 20;
+        }
+
+        if (_isPassedPawnBlockedByKing(
+          board,
+          row,
+          col,
+          white,
+        )) {
+          pawnScore -= _isEndgame(board) ? 45 : 25;
+        }
+
+        if (_isOutsidePassedPawn(
+          board,
+          col,
+          white,
+        )) {
+          pawnScore += 20;
+        }
+
+        if (ownKing != null) {
+          pawnScore += _kingSupportsPassedPawn(
+            ownKing,
+            row,
+            col,
+          );
+        }
+
+        score += pawnScore;
       }
     }
 
     return score;
+  }
+
+  bool _hasConnectedPassedPawn(
+      List<int> board,
+      int row,
+      int col,
+      bool white,
+      ) {
+    final int pawn = white ? 1 : -1;
+
+    for (int file = col - 1; file <= col + 1; file += 2) {
+      if (file < 0 || file > 7) {
+        continue;
+      }
+
+      for (int r = row - 1; r <= row + 1; r++) {
+        if (r < 0 || r > 7) {
+          continue;
+        }
+
+        final int index = BoardHelper.getIndex(
+          r,
+          file,
+        );
+
+        if (board[index] != pawn) {
+          continue;
+        }
+
+        if (_isPassedPawn(
+          board,
+          index,
+          white,
+        )) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  bool _isPassedPawnBlockedByKing(
+      List<int> board,
+      int row,
+      int col,
+      bool white,
+      ) {
+    final int enemyKing = white ? -6 : 6;
+
+    final int blockRow = white ? row - 1 : row + 1;
+
+    if (blockRow < 0 || blockRow > 7) {
+      return false;
+    }
+
+    final int blockIndex = BoardHelper.getIndex(
+      blockRow,
+      col,
+    );
+
+    return board[blockIndex] == enemyKing;
+  }
+
+  bool _hasFriendlyPawnOnAdjacentFile(
+      List<int> board,
+      int row,
+      int col,
+      bool white,
+      ) {
+    final int pawn = white ? 1 : -1;
+
+    for (int file = col - 1; file <= col + 1; file += 2) {
+      if (file < 0 || file > 7) {
+        continue;
+      }
+
+      for (int r = 0; r < 8; r++) {
+        if (board[BoardHelper.getIndex(r, file)] == pawn) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  bool _isOutsidePassedPawn(
+      List<int> board,
+      int col,
+      bool white,
+      ) {
+    final int enemyPawn = white ? -1 : 1;
+
+    int enemyMinFile = 8;
+    int enemyMaxFile = -1;
+
+    for (int i = 0; i < 64; i++) {
+      if (board[i] != enemyPawn) {
+        continue;
+      }
+
+      final int file = BoardHelper.getCol(i);
+
+      if (file < enemyMinFile) {
+        enemyMinFile = file;
+      }
+
+      if (file > enemyMaxFile) {
+        enemyMaxFile = file;
+      }
+    }
+
+    if (enemyMaxFile == -1) {
+      return true;
+    }
+
+    return col < enemyMinFile - 1 || col > enemyMaxFile + 1;
+  }
+
+  int _kingSupportsPassedPawn(
+      int kingIndex,
+      int pawnRow,
+      int pawnCol,
+      ) {
+    final int kingRow = BoardHelper.getRow(kingIndex);
+    final int kingCol = BoardHelper.getCol(kingIndex);
+
+    final int distance =
+        (kingRow - pawnRow).abs() +
+            (kingCol - pawnCol).abs();
+
+    if (distance <= 1) {
+      return 20;
+    }
+
+    if (distance == 2) {
+      return 10;
+    }
+
+    return 0;
   }
 
   bool _isEndgame(List<int> board) {
@@ -722,6 +1176,21 @@ class BoardEvaluator {
     }
 
     return count;
+  }
+
+  int? _findKing(
+      List<int> board,
+      bool white,
+      ) {
+    final int king = white ? 6 : -6;
+
+    for (int i = 0; i < 64; i++) {
+      if (board[i] == king) {
+        return i;
+      }
+    }
+
+    return null;
   }
 
   bool _isEnemy(
