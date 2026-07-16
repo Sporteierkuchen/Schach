@@ -146,8 +146,29 @@ class ChessAi {
         break;
       }
 
-      bestMove = move;
-      previousScore = move.score;
+      final bool oldIsImportantCapture =
+          bestMove != null && _isImportantCapture(state, bestMove);
+
+      final bool newIsImportantCapture =
+      _isImportantCapture(state, move);
+
+      if (
+      bestMove != null &&
+          oldIsImportantCapture &&
+          !newIsImportantCapture &&
+          move.score < bestMove.score + 250
+      ) {
+        print(
+          "🛡️ Wichtiger Capture bleibt erhalten | "
+              "Alt: ${bestMove.fromIndex}->${bestMove.toIndex} "
+              "Score=${bestMove.score} | "
+              "Neu: ${move.fromIndex}->${move.toIndex} "
+              "Score=${move.score}",
+        );
+      } else {
+        bestMove = move;
+        previousScore = move.score;
+      }
 
       print(
         "✅ Iterative Deepening Tiefe $depth fertig | "
@@ -285,6 +306,18 @@ class ChessAi {
       whiteKingIndex: whiteKingIndex,
       blackKingIndex: blackKingIndex,
     );
+  }
+
+  bool _isImportantCapture(AiGameState state, AiMove move) {
+    final int captured = state.board[move.toIndex];
+
+    if (captured == 0) {
+      return false;
+    }
+
+    final int capturedValue = evaluator.pieceValue(captured).abs();
+
+    return capturedValue >= 500;
   }
 
 }

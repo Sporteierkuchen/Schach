@@ -101,7 +101,7 @@ class MoveOrdering {
         movingPiece: piece,
       );
 
-      score += seeScore * 8;
+      score += seeScore * 4;
 
       final bool badCapture = see.isBadCapture(
         board: board,
@@ -111,7 +111,7 @@ class MoveOrdering {
       );
 
       if (badCapture) {
-        score -= 8000;
+        score -= 2500;
       }
 
       if (attackerValue <= victimValue) {

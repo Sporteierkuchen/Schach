@@ -75,6 +75,10 @@ class BoardEvaluator {
       endgame,
     );
 
+    score += spaceAdvantageScore(board, endgame);
+    score += knightOutpostScore(board);
+    score += bishopQualityScore(board);
+
     return score;
   }
 
@@ -339,7 +343,7 @@ class BoardEvaluator {
       } else if (attackers > defenders) {
         penalty = value ~/ 5;
       } else {
-        penalty = value ~/ 12;
+        penalty = 0;
       }
 
       if (piece.abs() == 1) {
@@ -540,14 +544,14 @@ class BoardEvaluator {
       final int row = BoardHelper.getRow(whiteQueen);
 
       // Weiße Dame zu früh weit draußen
-      if (row < 5) score -= 25;
+      if (row < 5) score -= 60;
     }
 
     if (blackQueen != -1) {
       final int row = BoardHelper.getRow(blackQueen);
 
       // Schwarze Dame zu früh weit draußen
-      if (row > 2) score += 25;
+      if (row > 2) score += 60;
     }
 
     return score;
@@ -749,8 +753,317 @@ class BoardEvaluator {
 
     score += _passedPawnScore(board, true);
     score -= _passedPawnScore(board, false);
+    score += pawnIslandScore(board);
+    score += backwardPawnScore(board);
 
     return score;
+  }
+
+  int pawnIslandScore(List<int> board) {
+    final List<bool> whiteFiles = List<bool>.filled(8, false);
+    final List<bool> blackFiles = List<bool>.filled(8, false);
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece.abs() != 1) {
+        continue;
+      }
+
+      final int file = BoardHelper.getCol(i);
+
+      if (piece > 0) {
+        whiteFiles[file] = true;
+      } else {
+        blackFiles[file] = true;
+      }
+    }
+
+    final int whiteIslands = _countPawnIslands(whiteFiles);
+    final int blackIslands = _countPawnIslands(blackFiles);
+
+    return (blackIslands - whiteIslands) * 12;
+  }
+
+  int _countPawnIslands(List<bool> files) {
+    int islands = 0;
+    bool inIsland = false;
+
+    for (int i = 0; i < 8; i++) {
+      if (files[i]) {
+        if (!inIsland) {
+          islands++;
+          inIsland = true;
+        }
+      } else {
+        inIsland = false;
+      }
+    }
+
+    return islands;
+  }
+
+  int backwardPawnScore(List<int> board) {
+    int score = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece.abs() != 1) {
+        continue;
+      }
+
+      final bool white = piece > 0;
+
+      if (_isBackwardPawn(board, i, white)) {
+        score += white ? -18 : 18;
+      }
+    }
+
+    return score;
+  }
+
+  bool _isBackwardPawn(
+      List<int> board,
+      int pawnIndex,
+      bool white,
+      ) {
+    final int row = BoardHelper.getRow(pawnIndex);
+    final int col = BoardHelper.getCol(pawnIndex);
+
+    final int ownPawn = white ? 1 : -1;
+    final int enemyPawn = white ? -1 : 1;
+
+    bool hasFriendlyPawnBehindOrSame = false;
+
+    for (int file = col - 1; file <= col + 1; file += 2) {
+      if (file < 0 || file > 7) {
+        continue;
+      }
+
+      for (int r = 0; r < 8; r++) {
+        final int index = BoardHelper.getIndex(r, file);
+
+        if (board[index] != ownPawn) {
+          continue;
+        }
+
+        if (white) {
+          if (r >= row) {
+            hasFriendlyPawnBehindOrSame = true;
+          }
+        } else {
+          if (r <= row) {
+            hasFriendlyPawnBehindOrSame = true;
+          }
+        }
+      }
+    }
+
+    if (hasFriendlyPawnBehindOrSame) {
+      return false;
+    }
+
+    final int frontRow = white ? row - 1 : row + 1;
+
+    if (frontRow < 0 || frontRow > 7) {
+      return false;
+    }
+
+    for (int file = col - 1; file <= col + 1; file++) {
+      if (file < 0 || file > 7) {
+        continue;
+      }
+
+      final int index = BoardHelper.getIndex(frontRow, file);
+
+      if (board[index] == enemyPawn) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  int spaceAdvantageScore(
+      List<int> board,
+      bool endgame,
+      ) {
+    if (endgame) {
+      return 0;
+    }
+
+    int whiteSpace = 0;
+    int blackSpace = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece == 0) {
+        continue;
+      }
+
+      final int row = BoardHelper.getRow(i);
+
+      if (piece > 0) {
+        if (row <= 3) {
+          whiteSpace++;
+        }
+      } else {
+        if (row >= 4) {
+          blackSpace++;
+        }
+      }
+    }
+
+    return (whiteSpace - blackSpace) * 6;
+  }
+
+  int knightOutpostScore(List<int> board) {
+    int score = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece.abs() != 2) {
+        continue;
+      }
+
+      final bool white = piece > 0;
+
+      if (_isKnightOutpost(board, i, white)) {
+        score += white ? 45 : -45;
+      }
+    }
+
+    return score;
+  }
+
+  bool _isKnightOutpost(
+      List<int> board,
+      int index,
+      bool white,
+      ) {
+    final int row = BoardHelper.getRow(index);
+    final int col = BoardHelper.getCol(index);
+
+    if (white && row > 4) {
+      return false;
+    }
+
+    if (!white && row < 3) {
+      return false;
+    }
+
+    if (!_isProtectedByPawn(board, index, white)) {
+      return false;
+    }
+
+    final int enemyPawn = white ? -1 : 1;
+
+    for (
+    int r = white ? row - 1 : row + 1;
+    white ? r >= 0 : r <= 7;
+    r += white ? -1 : 1
+    ) {
+      for (int c = col - 1; c <= col + 1; c += 2) {
+        if (c < 0 || c > 7) {
+          continue;
+        }
+
+        if (board[BoardHelper.getIndex(r, c)] == enemyPawn) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  bool _isProtectedByPawn(
+      List<int> board,
+      int index,
+      bool white,
+      ) {
+    final int row = BoardHelper.getRow(index);
+    final int col = BoardHelper.getCol(index);
+
+    final int pawn = white ? 1 : -1;
+    final int pawnRow = white ? row + 1 : row - 1;
+
+    if (pawnRow < 0 || pawnRow > 7) {
+      return false;
+    }
+
+    for (int c = col - 1; c <= col + 1; c += 2) {
+      if (c < 0 || c > 7) {
+        continue;
+      }
+
+      if (board[BoardHelper.getIndex(pawnRow, c)] == pawn) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  int bishopQualityScore(List<int> board) {
+    int score = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece.abs() != 3) {
+        continue;
+      }
+
+      final bool white = piece > 0;
+
+      final int mobility = _countPseudoLegalTargets(
+        board,
+        piece,
+        i,
+      );
+
+      int bonus = mobility * 3;
+
+      if (_isBadBishop(board, i, white)) {
+        bonus -= 35;
+      }
+
+      score += white ? bonus : -bonus;
+    }
+
+    return score;
+  }
+
+  bool _isBadBishop(
+      List<int> board,
+      int bishopIndex,
+      bool white,
+      ) {
+    final int bishopColor =
+        (BoardHelper.getRow(bishopIndex) + BoardHelper.getCol(bishopIndex)) % 2;
+
+    final int pawn = white ? 1 : -1;
+
+    int sameColorPawns = 0;
+
+    for (int i = 0; i < 64; i++) {
+      if (board[i] != pawn) {
+        continue;
+      }
+
+      final int color =
+          (BoardHelper.getRow(i) + BoardHelper.getCol(i)) % 2;
+
+      if (color == bishopColor) {
+        sameColorPawns++;
+      }
+    }
+
+    return sameColorPawns >= 4;
   }
 
   int kingSafetyScore(
@@ -772,6 +1085,18 @@ class BoardEvaluator {
         whiteKing,
         true,
       );
+
+      score -= _openLinesNearKingPenalty(
+        board,
+        whiteKing,
+        true,
+      );
+
+      score -= _kingAttackZonePenalty(
+        board,
+        whiteKing,
+        true,
+      );
     }
 
     if (blackKing != null) {
@@ -780,9 +1105,199 @@ class BoardEvaluator {
         blackKing,
         false,
       );
+
+      score += _openLinesNearKingPenalty(
+        board,
+        blackKing,
+        false,
+      );
+
+      score += _kingAttackZonePenalty(
+        board,
+        blackKing,
+        false,
+      );
     }
 
     return score;
+  }
+
+  int _openLinesNearKingPenalty(
+      List<int> board,
+      int kingIndex,
+      bool whiteKing,
+      ) {
+    int penalty = 0;
+
+    final int kingCol = BoardHelper.getCol(kingIndex);
+
+    for (int file = kingCol - 1; file <= kingCol + 1; file++) {
+      if (file < 0 || file > 7) {
+        continue;
+      }
+
+      final bool ownPawn = _hasPawnOnFile(
+        board,
+        file,
+        whiteKing,
+      );
+
+      final bool enemyRookOrQueen = _enemyRookOrQueenOnFile(
+        board,
+        file,
+        whiteKing,
+      );
+
+      if (!ownPawn) {
+        penalty += 18;
+      }
+
+      if (!ownPawn && enemyRookOrQueen) {
+        penalty += 35;
+      }
+    }
+
+    return penalty;
+  }
+
+  bool _hasPawnOnFile(
+      List<int> board,
+      int file,
+      bool white,
+      ) {
+    final int pawn = white ? 1 : -1;
+
+    for (int row = 0; row < 8; row++) {
+      if (board[BoardHelper.getIndex(row, file)] == pawn) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool _enemyRookOrQueenOnFile(
+      List<int> board,
+      int file,
+      bool whiteKing,
+      ) {
+    for (int row = 0; row < 8; row++) {
+      final int piece = board[BoardHelper.getIndex(row, file)];
+
+      if (piece == 0) {
+        continue;
+      }
+
+      if ((piece > 0) == whiteKing) {
+        continue;
+      }
+
+      if (piece.abs() == 4 || piece.abs() == 5) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  int _kingAttackZonePenalty(
+      List<int> board,
+      int kingIndex,
+      bool whiteKing,
+      ) {
+    int penalty = 0;
+
+    final List<int> zone = _kingZoneSquares(kingIndex);
+
+    int attackers = 0;
+    int attackWeight = 0;
+
+    for (int i = 0; i < 64; i++) {
+      final int piece = board[i];
+
+      if (piece == 0) {
+        continue;
+      }
+
+      if ((piece > 0) == whiteKing) {
+        continue;
+      }
+
+      int hits = 0;
+
+      for (final int target in zone) {
+        if (_pieceControlsSquare(
+          board,
+          i,
+          piece,
+          target,
+        )) {
+          hits++;
+        }
+      }
+
+      if (hits == 0) {
+        continue;
+      }
+
+      attackers++;
+
+      attackWeight += hits * _kingAttackPieceWeight(piece);
+    }
+
+    if (attackers >= 2) {
+      penalty += attackWeight;
+    }
+
+    if (attackers >= 3) {
+      penalty += 25;
+    }
+
+    if (attackers >= 4) {
+      penalty += 50;
+    }
+
+    return penalty;
+  }
+
+  List<int> _kingZoneSquares(int kingIndex) {
+    final List<int> squares = [];
+
+    final int row = BoardHelper.getRow(kingIndex);
+    final int col = BoardHelper.getCol(kingIndex);
+
+    for (int r = row - 1; r <= row + 1; r++) {
+      if (r < 0 || r > 7) {
+        continue;
+      }
+
+      for (int c = col - 1; c <= col + 1; c++) {
+        if (c < 0 || c > 7) {
+          continue;
+        }
+
+        squares.add(
+          BoardHelper.getIndex(r, c),
+        );
+      }
+    }
+
+    return squares;
+  }
+
+  int _kingAttackPieceWeight(int piece) {
+    switch (piece.abs()) {
+      case 2:
+        return 18;
+      case 3:
+        return 18;
+      case 4:
+        return 30;
+      case 5:
+        return 45;
+      default:
+        return 0;
+    }
   }
 
   int _kingPawnShieldScore(
@@ -795,30 +1310,45 @@ class BoardEvaluator {
     final int row = BoardHelper.getRow(kingIndex);
     final int col = BoardHelper.getCol(kingIndex);
 
-    final int pawnRow = whiteKing ? row - 1 : row + 1;
     final int pawnPiece = whiteKing ? 1 : -1;
 
-    if (pawnRow < 0 || pawnRow > 7) {
-      return 0;
-    }
+    final int shieldRow = whiteKing ? row - 1 : row + 1;
+    final int secondShieldRow = whiteKing ? row - 2 : row + 2;
 
     for (int c = col - 1; c <= col + 1; c++) {
-      if (c < 0 || c > 7) continue;
+      if (c < 0 || c > 7) {
+        continue;
+      }
 
-      final int index = BoardHelper.getIndex(
-        pawnRow,
-        c,
-      );
+      bool hasClosePawn = false;
+      bool hasSecondPawn = false;
 
-      if (board[index] == pawnPiece) {
-        score += 12;
+      if (shieldRow >= 0 && shieldRow <= 7) {
+        hasClosePawn =
+            board[BoardHelper.getIndex(shieldRow, c)] == pawnPiece;
+      }
+
+      if (secondShieldRow >= 0 && secondShieldRow <= 7) {
+        hasSecondPawn =
+            board[BoardHelper.getIndex(secondShieldRow, c)] == pawnPiece;
+      }
+
+      if (hasClosePawn) {
+        score += 18;
+      } else if (hasSecondPawn) {
+        score += 8;
       } else {
-        score -= 8;
+        score -= 16;
       }
     }
 
+    // König am Rand ist im Mittelspiel oft sicherer als im Zentrum
     if (col == 0 || col == 7) {
       score += 8;
+    }
+
+    if (col >= 2 && col <= 5) {
+      score -= 12;
     }
 
     return score;

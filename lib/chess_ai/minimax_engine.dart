@@ -26,6 +26,8 @@ class MinimaxEngine {
 
   late final StaticExchangeEvaluator see = StaticExchangeEvaluator(evaluator);
 
+  bool debugRootBreakdown = false;
+
   MinimaxEngine({
     required this.moveGenerator,
     required this.evaluator,
@@ -60,9 +62,6 @@ class MinimaxEngine {
     int? bestScore;
     AiMove? bestMove;
 
-    int localAlpha = alpha;
-    int localBeta = beta;
-
     bool completedRootSearch = true;
 
     final bool aiIsWhite = state.isWhiteTurn;
@@ -74,6 +73,10 @@ class MinimaxEngine {
       }
 
       final List<int> beforeBoard = List<int>.from(state.board);
+      final int captured = beforeBoard[move.toIndex];
+      final bool isCapture = captured != 0;
+      final int capturedValue =
+      isCapture ? evaluator.pieceValue(captured).abs() : 0;
 
       final MoveUndo undo = _makeMoveInPlace(
         state: state,
@@ -98,48 +101,126 @@ class MinimaxEngine {
         );
       }
 
+      int extension = 0;
+
+      if (isCapture && capturedValue >= 500) {
+        extension = 1;
+      }
+
+      if (move.promotionPiece != null) {
+        extension = 1;
+      }
+
+      final int searchDepth = depth - 1 + extension;
+
       int score = minimaxTimed(
         state: state,
-        depth: depth - 1,
-        alpha: localAlpha,
-        beta: localBeta,
+        depth: searchDepth,
+        alpha: alpha,
+        beta: beta,
         ply: 1,
         stopwatch: stopwatch,
         timeLimitMs: timeLimitMs,
       );
 
-      bool isMateScore = score.abs() > mateScore - 10000;
+      final bool isMateScore = score.abs() > mateScore - 10000;
 
       if (!isMateScore) {
+        final int minimaxScore = score;
 
-        score += _rootSeeAdjustment(
-          beforeBoard: beforeBoard,
+        int seeAdjustment = 0;
+        int hangingAdjustment = 0;
+        int opponentThreatAdjustment = 0;
+        int escapeBonus = 0;
+
+        if (isCapture) {
+          final int rawSeeAdjustment = _rootSeeAdjustment(
+            beforeBoard: beforeBoard,
+            move: move,
+            aiIsWhite: aiIsWhite,
+          );
+
+          if (rawSeeAdjustment > 0) {
+            seeAdjustment = rawSeeAdjustment;
+          } else if (capturedValue >= 500) {
+            seeAdjustment = rawSeeAdjustment.clamp(-100, 0);
+          } else {
+            seeAdjustment = rawSeeAdjustment.clamp(-600, 0);
+          }
+        } else {
+          hangingAdjustment = _rootHangingPiecesAdjustment(
+            afterState: state,
+            aiIsWhite: aiIsWhite,
+          );
+
+          opponentThreatAdjustment = _rootOpponentThreatAdjustment(
+            afterState: state,
+            aiIsWhite: aiIsWhite,
+          );
+
+          escapeBonus = _rootAttackedPieceEscapeBonus(
+            beforeBoard: beforeBoard,
+            afterBoard: state.board,
+            move: move,
+            aiIsWhite: aiIsWhite,
+          );
+        }
+
+        final int opponentMateThreatAdjustment =
+        _rootOpponentMateThreatAdjustment(
+          afterState: state,
+          aiIsWhite: aiIsWhite,
+        );
+
+        final int recaptureBonus = _rootRecaptureBonus(
+          boardBeforeMove: beforeBoard,
           move: move,
           aiIsWhite: aiIsWhite,
         );
 
-        score += _rootHangingPiecesAdjustment(
-          afterState: state,
-          aiIsWhite: aiIsWhite,
+        final int undevelopmentPenalty = _rootUndevelopmentPenalty(
+          move: move,
         );
 
-        score += _rootOpponentThreatAdjustment(
-          afterState: state,
-          aiIsWhite: aiIsWhite,
+        final int edgePenalty = _rootMinorPieceEdgePenalty(
+          move: move,
         );
 
-        score += _rootAttackedPieceEscapeBonus(
-          beforeBoard: beforeBoard,
-          afterBoard: state.board,
+        final int retreatPenalty = _rootMinorPieceRetreatPenalty(
+          move: move,
+        );
+
+        final int highValueCaptureBonus = _rootHighValueCaptureBonus(
+          boardBeforeMove: beforeBoard,
           move: move,
           aiIsWhite: aiIsWhite,
         );
 
-        score += _rootOpponentMateThreatAdjustment(
-          afterState: state,
-          aiIsWhite: aiIsWhite,
-        );
+        score += seeAdjustment;
+        score += hangingAdjustment;
+        score += opponentThreatAdjustment;
+        score += escapeBonus;
+        score += opponentMateThreatAdjustment;
+        score += recaptureBonus;
+        score += undevelopmentPenalty;
+        score += edgePenalty;
+        score += retreatPenalty;
+        score += highValueCaptureBonus;
 
+        _printRootBreakdown(
+          move: move,
+          minimaxScore: minimaxScore,
+          seeAdjustment: seeAdjustment,
+          hangingAdjustment: hangingAdjustment,
+          opponentThreatAdjustment: opponentThreatAdjustment,
+          escapeBonus: escapeBonus,
+          opponentMateThreatAdjustment: opponentMateThreatAdjustment,
+          recaptureBonus: recaptureBonus,
+          undevelopmentPenalty: undevelopmentPenalty,
+          edgePenalty: edgePenalty,
+          retreatPenalty: retreatPenalty,
+          finalScore: score,
+        );
       }
 
       _undoMoveInPlace(
@@ -167,16 +248,6 @@ class MinimaxEngine {
           score: score,
         );
       }
-
-      if (aiIsWhite) {
-        localAlpha = max(localAlpha, bestScore);
-      } else {
-        localBeta = min(localBeta, bestScore);
-      }
-
-      if (localAlpha >= localBeta) {
-        break;
-      }
     }
 
     print(
@@ -187,6 +258,18 @@ class MinimaxEngine {
     );
 
     if (!completedRootSearch) {
+      final bool bestIsMate =
+          bestScore != null &&
+              bestScore.abs() > mateScore - 10000;
+
+      if (bestIsMate && bestMove != null) {
+        print(
+          "⏱️ Tiefe $depth unvollständig, aber Matt gefunden -> wird behalten",
+        );
+
+        return bestMove;
+      }
+
       print("⏱️ Tiefe $depth unvollständig -> Ergebnis wird verworfen");
       return null;
     }
@@ -1036,6 +1119,256 @@ class MinimaxEngine {
     }
 
     return 0;
+  }
+
+
+  int _rootUndevelopmentPenalty({
+    required AiMove move,
+  }) {
+    final int piece = move.piece;
+
+    if (piece.abs() != 2 && piece.abs() != 3) {
+      return 0;
+    }
+
+    final int from = move.fromIndex;
+    final int to = move.toIndex;
+
+    final bool whiteMinorBackToStart =
+        piece > 0 &&
+            (to == BoardHelper.getIndex(7, 1) ||
+                to == BoardHelper.getIndex(7, 6) ||
+                to == BoardHelper.getIndex(7, 2) ||
+                to == BoardHelper.getIndex(7, 5));
+
+    final bool blackMinorBackToStart =
+        piece < 0 &&
+            (to == BoardHelper.getIndex(0, 1) ||
+                to == BoardHelper.getIndex(0, 6) ||
+                to == BoardHelper.getIndex(0, 2) ||
+                to == BoardHelper.getIndex(0, 5));
+
+    if (!whiteMinorBackToStart && !blackMinorBackToStart) {
+      return 0;
+    }
+
+    final bool wasAlreadyDeveloped =
+        from != BoardHelper.getIndex(7, 1) &&
+            from != BoardHelper.getIndex(7, 6) &&
+            from != BoardHelper.getIndex(7, 2) &&
+            from != BoardHelper.getIndex(7, 5) &&
+            from != BoardHelper.getIndex(0, 1) &&
+            from != BoardHelper.getIndex(0, 6) &&
+            from != BoardHelper.getIndex(0, 2) &&
+            from != BoardHelper.getIndex(0, 5);
+
+    if (!wasAlreadyDeveloped) {
+      return 0;
+    }
+
+    return piece > 0 ? -180 : 180;
+  }
+
+  int _rootMinorPieceEdgePenalty({
+    required AiMove move,
+  }) {
+    final int piece = move.piece;
+
+    if (piece.abs() != 2 && piece.abs() != 3) {
+      return 0;
+    }
+
+    final int fromRow = BoardHelper.getRow(move.fromIndex);
+    final int fromCol = BoardHelper.getCol(move.fromIndex);
+    final int toRow = BoardHelper.getRow(move.toIndex);
+    final int toCol = BoardHelper.getCol(move.toIndex);
+
+    final bool wasDeveloped =
+    !_isMinorPieceStartSquare(
+      row: fromRow,
+      col: fromCol,
+      white: piece > 0,
+    );
+
+    if (!wasDeveloped) {
+      return 0;
+    }
+
+    final bool toEdge =
+        toRow == 0 ||
+            toRow == 7 ||
+            toCol == 0 ||
+            toCol == 7;
+
+    if (!toEdge) {
+      return 0;
+    }
+
+    return piece > 0 ? -180 : 180;
+  }
+
+  bool _isMinorPieceStartSquare({
+    required int row,
+    required int col,
+    required bool white,
+  }) {
+    if (white) {
+      return row == 7 && (col == 1 || col == 2 || col == 5 || col == 6);
+    }
+
+    return row == 0 && (col == 1 || col == 2 || col == 5 || col == 6);
+  }
+
+  int _rootMinorPieceRetreatPenalty({
+    required AiMove move,
+  }) {
+    final int piece = move.piece;
+
+    if (piece.abs() != 2 && piece.abs() != 3) {
+      return 0;
+    }
+
+    final int fromRow = BoardHelper.getRow(move.fromIndex);
+    final int fromCol = BoardHelper.getCol(move.fromIndex);
+    final int toRow = BoardHelper.getRow(move.toIndex);
+    final int toCol = BoardHelper.getCol(move.toIndex);
+
+    final bool wasDeveloped =
+    !_isMinorPieceStartSquare(
+      row: fromRow,
+      col: fromCol,
+      white: piece > 0,
+    );
+
+    if (!wasDeveloped) {
+      return 0;
+    }
+
+    final int fromCenterDistance =
+        (fromRow - 3).abs() + (fromCol - 3).abs();
+
+    final int toCenterDistance =
+        (toRow - 3).abs() + (toCol - 3).abs();
+
+    if (toCenterDistance <= fromCenterDistance) {
+      return 0;
+    }
+
+    final int penalty = (toCenterDistance - fromCenterDistance) * 60;
+
+    return piece > 0 ? -penalty : penalty;
+  }
+
+  int _rootRecaptureBonus({
+    required List<int> boardBeforeMove,
+    required AiMove move,
+    required bool aiIsWhite,
+  }) {
+    final int captured = boardBeforeMove[move.toIndex];
+
+    if (captured == 0) {
+      return 0;
+    }
+
+    final int capturedValue = evaluator.pieceValue(captured).abs();
+    final int attackerValue = evaluator.pieceValue(move.piece).abs();
+
+    int bonus = 0;
+
+    // Sehr guter Trade: billigere Figur schlägt teurere Figur
+    if (attackerValue < capturedValue) {
+      bonus += (capturedValue - attackerValue) ~/ 2;
+    }
+
+    // Gleichwertiger Trade: Turm gegen Turm, Dame gegen Dame, Läufer gegen Springer usw.
+    if ((capturedValue - attackerValue).abs() <= 50) {
+      bonus += 80;
+    }
+
+    // Bauern schlagen Leichtfigur/Turm/Dame: fast immer priorisieren
+    if (attackerValue == 100 && capturedValue >= 300) {
+      bonus += 250;
+    }
+
+    // Keine Boni für Dame frisst Bauern
+    if (attackerValue >= 900 && capturedValue <= 100) {
+      bonus -= 180;
+    }
+
+    // Keine Boni für Turm/Dame schlägt kleine Figur, wenn das eher Bauernraub ist
+    if (attackerValue > capturedValue + 200) {
+      // Dame schlägt Turm / Turm schlägt Leichtfigur kann taktisch korrekt sein.
+      // Nicht pauschal bestrafen, wenn eine große Figur geschlagen wird.
+      if (capturedValue < 500) {
+        bonus -= 80;
+      }
+    }
+
+    return aiIsWhite ? bonus : -bonus;
+  }
+
+  int _rootHighValueCaptureBonus({
+    required List<int> boardBeforeMove,
+    required AiMove move,
+    required bool aiIsWhite,
+  }) {
+    final int captured = boardBeforeMove[move.toIndex];
+
+    if (captured == 0) {
+      return 0;
+    }
+
+    final int attackerValue = evaluator.pieceValue(move.piece).abs();
+    final int capturedValue = evaluator.pieceValue(captured).abs();
+
+    int bonus = 0;
+
+    // Dame schlägt Turm: taktisch wichtiger Zug, nicht unterbewerten
+    if (attackerValue == 900 && capturedValue == 500) {
+      bonus += 450;
+    }
+
+    // Turm schlägt Dame oder Leichtfigur schlägt Dame sowieso stark
+    if (capturedValue == 900 && attackerValue < 900) {
+      bonus += 700;
+    }
+
+    return aiIsWhite ? bonus : -bonus;
+  }
+
+  void _printRootBreakdown({
+    required AiMove move,
+    required int minimaxScore,
+    required int seeAdjustment,
+    required int hangingAdjustment,
+    required int opponentThreatAdjustment,
+    required int escapeBonus,
+    required int opponentMateThreatAdjustment,
+    required int recaptureBonus,
+    required int undevelopmentPenalty,
+    required int edgePenalty,
+    required int retreatPenalty,
+    required int finalScore,
+  }) {
+    if (!debugRootBreakdown) {
+      return;
+    }
+
+    print(
+      'ROOT ${BoardHelper.indexToCoord(move.fromIndex)}'
+          '${BoardHelper.indexToCoord(move.toIndex)} | '
+          'minimax=$minimaxScore | '
+          'see=$seeAdjustment | '
+          'hanging=$hangingAdjustment | '
+          'oppThreat=$opponentThreatAdjustment | '
+          'escape=$escapeBonus | '
+          'oppMate=$opponentMateThreatAdjustment | '
+          'recap=$recaptureBonus | '
+          'undevelop=$undevelopmentPenalty | '
+          'edge=$edgePenalty | '
+          'retreat=$retreatPenalty | '
+          'final=$finalScore',
+    );
   }
 
   int _rootOpponentThreatAdjustment({

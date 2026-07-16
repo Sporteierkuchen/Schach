@@ -539,4 +539,582 @@ class TestPositions {
     );
   }
 
+  static AiGameState springerZurueck() {
+    final board = List<int>.filled(64, 0);
+
+    final mapper = BoardCoordinateMapper(
+      figurenfarbe: false,
+    );
+
+    void put(int row, int col, int piece) {
+      board[mapper.guiToAiIndex(row, col)] = piece;
+    }
+
+    put(0, 0, 4); // Weiß TURM
+    put(0, 2, 3); // Weiß LAEUFER
+    put(0, 3, 6); // Weiß KOENIG
+    put(0, 4, 5); // Weiß DAME
+    put(0, 5, 3); // Weiß LAEUFER
+    put(0, 6, 2); // Weiß SPRINGER
+    put(0, 7, 4); // Weiß TURM
+    put(1, 0, 1); // Weiß BAUER
+    put(1, 1, 1); // Weiß BAUER
+    put(1, 2, 1); // Weiß BAUER
+    put(1, 3, 1); // Weiß BAUER
+    put(1, 6, 1); // Weiß BAUER
+    put(1, 7, 1); // Weiß BAUER
+    put(2, 2, 2); // Weiß SPRINGER
+    put(3, 1, -3); // Schwarz LAEUFER
+    put(3, 4, 1); // Weiß BAUER
+    put(3, 5, -1); // Schwarz BAUER
+    put(6, 0, -1); // Schwarz BAUER
+    put(6, 1, -1); // Schwarz BAUER
+    put(6, 2, -1); // Schwarz BAUER
+    put(6, 3, -1); // Schwarz BAUER
+    put(6, 5, -1); // Schwarz BAUER
+    put(6, 6, -1); // Schwarz BAUER
+    put(6, 7, -1); // Schwarz BAUER
+    put(7, 0, -4); // Schwarz TURM
+    put(7, 1, -2); // Schwarz SPRINGER
+    put(7, 2, -3); // Schwarz LAEUFER
+    put(7, 3, -6); // Schwarz KOENIG
+    put(7, 4, -5); // Schwarz DAME
+    put(7, 6, -2); // Schwarz SPRINGER
+    put(7, 7, -4); // Schwarz TURM
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: true,
+      playerIsWhite: false,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
+  static AiGameState laeufernichtschlagen() {
+    final board = List<int>.filled(64, 0);
+
+    final mapper = BoardCoordinateMapper(
+      figurenfarbe: false,
+    );
+
+    void put(int row, int col, int piece) {
+      board[mapper.guiToAiIndex(row, col)] = piece;
+    }
+
+    put(0, 0, 4); // Weiß TURM
+    put(0, 2, 3); // Weiß LAEUFER
+    put(0, 4, 4); // Weiß TURM
+    put(0, 5, 6); // Weiß KOENIG
+    put(1, 0, 1); // Weiß BAUER
+    put(1, 1, 1); // Weiß BAUER
+    put(1, 2, 1); // Weiß BAUER
+    put(1, 3, 1); // Weiß BAUER
+    put(1, 6, 1); // Weiß BAUER
+    put(1, 7, 1); // Weiß BAUER
+    put(2, 2, 2); // Weiß SPRINGER
+    put(2, 4, 5); // Weiß DAME
+    put(2, 7, -3); // Schwarz LAEUFER
+    put(3, 2, 3); // Weiß LAEUFER
+    put(3, 3, -2); // Schwarz SPRINGER
+    put(3, 4, -1); // Schwarz BAUER
+    put(4, 2, -3); // Schwarz LAEUFER
+    put(4, 4, -1); // Schwarz BAUER
+    put(5, 3, -1); // Schwarz BAUER
+    put(5, 5, -2); // Schwarz SPRINGER
+    put(5, 7, -1); // Schwarz BAUER
+    put(6, 0, -1); // Schwarz BAUER
+    put(6, 1, -1); // Schwarz BAUER
+    put(6, 2, -1); // Schwarz BAUER
+    put(6, 5, -1); // Schwarz BAUER
+    put(7, 0, -4); // Schwarz TURM
+    put(7, 3, -6); // Schwarz KOENIG
+    put(7, 4, -5); // Schwarz DAME
+    put(7, 6, -4); // Schwarz TURM
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: true,
+      playerIsWhite: false,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  static AiGameState queenTradeWhenAhead() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;   // Weiß Kg1
+    board[BoardHelper.getIndex(0, 6)] = -6;  // Schwarz Kg8
+
+    board[BoardHelper.getIndex(3, 3)] = 5;   // Weiß Dame d5
+    board[BoardHelper.getIndex(3, 4)] = -5;  // Schwarz Dame e5
+
+    board[BoardHelper.getIndex(7, 0)] = 4;   // Weiß Turm a1
+    board[BoardHelper.getIndex(0, 0)] = -4;  // Schwarz Turm a8
+
+    board[BoardHelper.getIndex(6, 0)] = 1;
+    board[BoardHelper.getIndex(6, 1)] = 1;
+    board[BoardHelper.getIndex(6, 2)] = 1;
+    board[BoardHelper.getIndex(1, 0)] = -1;
+    board[BoardHelper.getIndex(1, 1)] = -1;
+
+    // Weiß hat einen Bauern mehr und sollte Damentausch mögen.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState queenTradeBadDuringAttack() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;   // Weiß Kg1
+    board[BoardHelper.getIndex(0, 6)] = -6;  // Schwarz Kg8
+
+    board[BoardHelper.getIndex(3, 7)] = 5;   // Weiß Dame h5
+    board[BoardHelper.getIndex(1, 5)] = -5;  // Schwarz Dame f7
+
+    board[BoardHelper.getIndex(4, 2)] = 3;   // Weiß Läufer c4
+    board[BoardHelper.getIndex(5, 6)] = 2;   // Weiß Springer g3
+    board[BoardHelper.getIndex(1, 6)] = -1;  // Schwarz Bauer g7
+    board[BoardHelper.getIndex(1, 7)] = -1;  // Schwarz Bauer h7
+
+    // Weiß hat Angriffsidee gegen König. Damentausch sollte nicht automatisch bevorzugt werden.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState rookTradeWhenAhead() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(3, 3)] = 4;   // Weiß Turm d5
+    board[BoardHelper.getIndex(3, 4)] = -4;  // Schwarz Turm e5
+
+    board[BoardHelper.getIndex(6, 0)] = 1;
+    board[BoardHelper.getIndex(6, 1)] = 1;
+    board[BoardHelper.getIndex(6, 2)] = 1;
+    board[BoardHelper.getIndex(1, 0)] = -1;
+
+    // Weiß klar vorne, Turmtausch ist gut.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState activePieceShouldNotTradePassivePiece() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;   // Weiß Kg1
+    board[BoardHelper.getIndex(0, 6)] = -6;  // Schwarz Kg8
+
+    board[BoardHelper.getIndex(3, 4)] = 2;   // Weißer aktiver Springer e5
+    board[BoardHelper.getIndex(2, 2)] = -2;  // Schwarzer Springer c6
+
+    board[BoardHelper.getIndex(6, 3)] = 1;   // Weiß Bauer d2
+    board[BoardHelper.getIndex(6, 4)] = 1;   // Weiß Bauer e2
+    board[BoardHelper.getIndex(1, 3)] = -1;  // Schwarz Bauer d7
+    board[BoardHelper.getIndex(1, 4)] = -1;  // Schwarz Bauer e7
+
+    // Weiß kann Sxc6 spielen, aber tauscht aktive Figur gegen passive Figur.
+    // Besser wäre Entwicklung / Bauernzug / Springer aktiv halten.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState simpleExchangeWinsMaterial() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(4, 3)] = 3;    // Weiß Läufer d4
+    board[BoardHelper.getIndex(3, 4)] = -2;   // Schwarz Springer e5
+    board[BoardHelper.getIndex(2, 5)] = -4;   // Schwarz Turm f6
+
+    board[BoardHelper.getIndex(5, 2)] = 5;    // Weiß Dame c3 unterstützt
+    board[BoardHelper.getIndex(1, 0)] = -1;
+    board[BoardHelper.getIndex(6, 0)] = 1;
+
+    // Weiß kann Schlagfolge starten und Material gewinnen.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
+
+
+  static AiGameState passivePieceShouldTradeActivePiece() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;   // Weiß Kg1
+    board[BoardHelper.getIndex(0, 6)] = -6;  // Schwarz Kg8
+
+    board[BoardHelper.getIndex(5, 3)] = 2;   // Weißer passiver Springer d3
+    board[BoardHelper.getIndex(3, 4)] = -2;  // Schwarzer aktiver Springer e5
+
+    board[BoardHelper.getIndex(6, 2)] = 1;
+    board[BoardHelper.getIndex(6, 5)] = 1;
+    board[BoardHelper.getIndex(1, 2)] = -1;
+    board[BoardHelper.getIndex(1, 5)] = -1;
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState avoidQueenTradeWhenBehind() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(3, 3)] = 5;    // Weiß Dame d5
+    board[BoardHelper.getIndex(3, 4)] = -5;   // Schwarz Dame e5
+
+    board[BoardHelper.getIndex(0, 0)] = -4;   // Schwarz extra Turm
+    board[BoardHelper.getIndex(6, 0)] = 1;
+    board[BoardHelper.getIndex(1, 0)] = -1;
+
+    // Weiß ist materiell schlechter, sollte Damentausch eher vermeiden.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState avoidRookTradeWhenBehind() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(3, 3)] = 4;    // Weiß Turm d5
+    board[BoardHelper.getIndex(3, 4)] = -4;   // Schwarz Turm e5
+
+    board[BoardHelper.getIndex(0, 0)] = -4;   // Schwarz extra Turm
+
+    board[BoardHelper.getIndex(6, 0)] = 1;
+    board[BoardHelper.getIndex(1, 0)] = -1;
+
+    // Weiß ist materiell schlechter, sollte Turmtausch eher vermeiden.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState queenTradeWhenOwnKingUnsafe() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;    // Weiß Kg1
+    board[BoardHelper.getIndex(0, 6)] = -6;   // Schwarz Kg8
+
+    board[BoardHelper.getIndex(5, 7)] = 5;    // Weiß Dame h3
+    board[BoardHelper.getIndex(3, 7)] = -5;   // Schwarz Dame h5
+
+    board[BoardHelper.getIndex(6, 6)] = 1;    // Weiß Bauer g2
+    // h-Bauer fehlt -> König luftig
+    board[BoardHelper.getIndex(1, 6)] = -1;
+    board[BoardHelper.getIndex(1, 7)] = -1;
+
+    // Damentausch Qxh5 sollte wegen unsicherem König gut sein.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState avoidTradeWhenDefenderNeeded() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;    // Weiß Kg1
+    board[BoardHelper.getIndex(0, 6)] = -6;   // Schwarz Kg8
+
+    board[BoardHelper.getIndex(5, 5)] = 2;    // Weiß Springer f3 deckt h2/g1
+    board[BoardHelper.getIndex(3, 4)] = -2;   // Schwarz Springer e5
+
+    board[BoardHelper.getIndex(1, 7)] = -5;   // Schwarze Dame h7
+    board[BoardHelper.getIndex(6, 7)] = 1;    // Weiß Bauer h2
+    board[BoardHelper.getIndex(6, 6)] = 1;    // Weiß Bauer g2
+
+    // Springer f3 erfüllt defensive Aufgaben.
+    // Tausch Nxe5 kann gefährlich sein.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState badExchangeLosesMaterial() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;   // Weiß Kg1
+    board[BoardHelper.getIndex(0, 6)] = -6;  // Schwarz Kg8
+
+    board[BoardHelper.getIndex(4, 3)] = 3;    // Weiß Läufer d4
+    board[BoardHelper.getIndex(3, 4)] = -2;   // Schwarz Springer e5
+
+    board[BoardHelper.getIndex(2, 5)] = -4;   // Schwarz Turm f6
+    board[BoardHelper.getIndex(1, 4)] = -5;   // Schwarz Dame e7 unterstützt e5/f6
+
+    board[BoardHelper.getIndex(5, 2)] = 5;    // Weiß Dame c3
+    board[BoardHelper.getIndex(6, 0)] = 1;
+    board[BoardHelper.getIndex(1, 0)] = -1;
+
+    // Weiß kann Bxe5 spielen, aber nach weiterer Schlagfolge
+    // sollte der Abtausch ungünstig sein.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState schlagen() {
+    final board = List<int>.filled(64, 0);
+
+    final mapper = BoardCoordinateMapper(
+      figurenfarbe: true,
+    );
+
+    void put(int row, int col, int piece) {
+      board[mapper.guiToAiIndex(row, col)] = piece;
+    }
+
+    put(0, 2, -6); // Schwarz KOENIG
+    put(1, 0, -1); // Schwarz BAUER
+    put(1, 1, -1); // Schwarz BAUER
+    put(2, 4, -5); // Schwarz DAME
+    put(3, 3, -1); // Schwarz BAUER
+    put(4, 1, 1); // Weiß BAUER
+    put(4, 2, 1); // Weiß BAUER
+    put(4, 3, 1); // Weiß BAUER
+    put(4, 4, -2); // Schwarz SPRINGER
+    put(5, 3, 5); // Weiß DAME
+    put(5, 6, -4); // Schwarz TURM
+    put(6, 0, 1); // Weiß BAUER
+    put(6, 6, 1); // Weiß BAUER
+    put(7, 4, 4); // Weiß TURM
+    put(7, 6, 6); // Weiß KOENIG
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
+
+
+  static AiGameState exchangeRookTakesKnightThenWinsQueen() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(7, 4)] = 4;   // Weiß Turm e1
+    board[BoardHelper.getIndex(4, 4)] = -2;  // Schwarz Springer e4
+    board[BoardHelper.getIndex(2, 4)] = -5;  // Schwarz Dame e6
+
+    board[BoardHelper.getIndex(5, 3)] = 5;   // Weiß Dame d3
+    board[BoardHelper.getIndex(5, 6)] = -4;  // Schwarz Turm g3
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState exchangeBishopTakesRookThenWinsQueen() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(4, 2)] = 3;   // Weiß Läufer c4
+    board[BoardHelper.getIndex(3, 5)] = -4;  // Schwarz Turm f5
+    board[BoardHelper.getIndex(2, 6)] = -5;  // Schwarz Dame g6
+
+    board[BoardHelper.getIndex(5, 3)] = 4;   // Weiß Turm d3
+    board[BoardHelper.getIndex(1, 0)] = -1;
+    board[BoardHelper.getIndex(6, 0)] = 1;
+
+    // Idee: Bxf5 gewinnt Turm. Falls ...Qxf5, Rxd8/ähnlich später.
+    // Erst Diagnose, ggf. Erwartungszug anpassen.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState exchangeKnightTakesRookThenWinsQueen() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(4, 4)] = 2;   // Weiß Springer e4
+    board[BoardHelper.getIndex(2, 5)] = -4;  // Schwarz Turm f6
+    board[BoardHelper.getIndex(2, 3)] = -5;  // Schwarz Dame d6
+
+    board[BoardHelper.getIndex(5, 2)] = 4;   // Weiß Turm c3
+    board[BoardHelper.getIndex(6, 0)] = 1;
+    board[BoardHelper.getIndex(1, 0)] = -1;
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState exchangePawnTakesMinorThenWinsRook() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(4, 3)] = 1;   // Weiß Bauer d4
+    board[BoardHelper.getIndex(3, 4)] = -2;  // Schwarz Springer e5
+    board[BoardHelper.getIndex(2, 5)] = -4;  // Schwarz Turm f6
+
+    board[BoardHelper.getIndex(5, 2)] = 5;   // Weiß Dame c3
+    board[BoardHelper.getIndex(6, 0)] = 1;
+    board[BoardHelper.getIndex(1, 0)] = -1;
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+  static AiGameState badQueenTakesMinorLosesQueen() {
+    final board = List<int>.filled(64, 0);
+
+    board[BoardHelper.getIndex(7, 6)] = 6;
+    board[BoardHelper.getIndex(0, 6)] = -6;
+
+    board[BoardHelper.getIndex(5, 3)] = 5;   // Weiß Dame d3
+    board[BoardHelper.getIndex(4, 4)] = -2;  // Schwarz Springer e4
+
+    board[BoardHelper.getIndex(2, 6)] = -3;  // Schwarz Läufer g6 deckt e4/f5
+    board[BoardHelper.getIndex(0, 0)] = -4;  // Schwarz Turm a8
+    board[BoardHelper.getIndex(7, 0)] = 4;   // Weiß Turm a1
+
+    // Dame sollte nicht einfach Dxe4 spielen, wenn sie danach taktisch verliert.
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
+
 }
