@@ -10,6 +10,26 @@ import 'move_ordering.dart';
 import 'transposition_table.dart';
 import 'zobrist_hasher.dart';
 
+
+class RootSearchResult {
+  final AiMove move;
+
+  /// Roher Score des tatsächlich ausgewählten Zuges.
+  final int moveSearchScore;
+
+  /// Bester roher Suchwert über alle Root-Züge.
+  final int bestSearchScore;
+
+  final int adjustedScore;
+
+  const RootSearchResult({
+    required this.move,
+    required this.moveSearchScore,
+    required this.bestSearchScore,
+    required this.adjustedScore,
+  });
+}
+
 class MinimaxEngine {
   final MoveGenerator moveGenerator;
   final BoardEvaluator evaluator;
@@ -28,6 +48,8 @@ class MinimaxEngine {
 
   bool debugRootBreakdown = false;
 
+  bool _searchTimedOut = false;
+
   MinimaxEngine({
     required this.moveGenerator,
     required this.evaluator,
@@ -35,7 +57,29 @@ class MinimaxEngine {
     required this.transpositionTable,
   });
 
+
   AiMove? findBestMoveTimed({
+    required AiGameState state,
+    required int depth,
+    required Stopwatch stopwatch,
+    required int timeLimitMs,
+    int alpha = -infinity,
+    int beta = infinity,
+  }) {
+    final RootSearchResult? result = findBestMoveTimedResult(
+      state: state,
+      depth: depth,
+      stopwatch: stopwatch,
+      timeLimitMs: timeLimitMs,
+      alpha: alpha,
+      beta: beta,
+    );
+
+    return result?.move;
+  }
+
+
+  RootSearchResult? findBestMoveTimedResult({
     required AiGameState state,
     required int depth,
     required Stopwatch stopwatch,
@@ -47,6 +91,7 @@ class MinimaxEngine {
       heuristics.clear();
     }
 
+    _searchTimedOut = false;
     searchedNodes = 0;
 
     final List<AiMove> legalMoves = _getOrderedMoves(
@@ -59,61 +104,113 @@ class MinimaxEngine {
       return null;
     }
 
-    int? bestScore;
+    final bool aiIsWhite = state.isWhiteTurn;
+
+    /*
+   * Bester roher Minimax-Wert über alle Root-Züge.
+   *
+   * Dieser Wert kann für Aspiration Windows verwendet werden,
+   * wenn die Root-Suche dafür korrekt mit Bounds umgeht.
+   */
+    int bestSearchScore =
+    aiIsWhite ? -infinity : infinity;
+
+    /*
+   * Bester Wert inklusive Root-Heuristiken.
+   * Dieser Wert entscheidet über den tatsächlich gewählten Zug.
+   */
+    int? bestAdjustedScore;
+
+    /*
+   * Roher Minimax-Wert des tatsächlich anhand von
+   * adjustedScore ausgewählten Zuges.
+   */
+    int? bestMoveSearchScore;
+
     AiMove? bestMove;
 
     bool completedRootSearch = true;
 
-    final bool aiIsWhite = state.isWhiteTurn;
-
     for (final AiMove move in legalMoves) {
       if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
+        _searchTimedOut = true;
         completedRootSearch = false;
         break;
       }
 
-      final List<int> beforeBoard = List<int>.from(state.board);
-      final int captured = beforeBoard[move.toIndex];
-      final bool isCapture = captured != 0;
-      final int capturedValue =
-      isCapture ? evaluator.pieceValue(captured).abs() : 0;
+      final List<int> beforeBoard =
+      List<int>.from(state.board);
+
+      final int captured =
+      beforeBoard[move.toIndex];
+
+      final bool isCapture =
+          captured != 0;
+
+      final int capturedValue = isCapture
+          ? evaluator.pieceValue(captured).abs()
+          : 0;
 
       final MoveUndo undo = _makeMoveInPlace(
         state: state,
         move: move,
       );
 
+      /*
+     * Direktes Matt nach dem Root-Zug.
+     */
       if (moveGenerator.isCheckmate(state: state)) {
         _undoMoveInPlace(
           state: state,
           undo: undo,
         );
 
-        final int mateMoveScore =
-        aiIsWhite ? mateScore - 1 : -mateScore + 1;
+        final int mateMoveScore = aiIsWhite
+            ? mateScore - 1
+            : -mateScore + 1;
 
-        return AiMove(
+        final AiMove mateMove = AiMove(
           fromIndex: move.fromIndex,
           toIndex: move.toIndex,
           piece: move.piece,
           promotionPiece: move.promotionPiece,
           score: mateMoveScore,
         );
+
+        return RootSearchResult(
+          move: mateMove,
+          moveSearchScore: mateMoveScore,
+          bestSearchScore: mateMoveScore,
+          adjustedScore: mateMoveScore,
+        );
       }
 
       int extension = 0;
 
+      /*
+     * Taktische Erweiterung für wertvolle Captures.
+     */
       if (isCapture && capturedValue >= 500) {
         extension = 1;
       }
 
+      /*
+     * Promotionen ebenfalls eine Halbzugtiefe weiter untersuchen.
+     */
       if (move.promotionPiece != null) {
         extension = 1;
       }
 
-      final int searchDepth = depth - 1 + extension;
+      final int searchDepth =
+          depth - 1 + extension;
 
-      int score = minimaxTimed(
+      /*
+     * Reiner Minimax-/Alpha-Beta-Wert.
+     *
+     * Dieser Wert darf nicht durch Root-Heuristiken
+     * überschrieben oder verändert werden.
+     */
+      final int rawSearchScore = minimaxTimed(
         state: state,
         depth: searchDepth,
         alpha: alpha,
@@ -123,18 +220,76 @@ class MinimaxEngine {
         timeLimitMs: timeLimitMs,
       );
 
-      final bool isMateScore = score.abs() > mateScore - 10000;
+      /*
+     * Wenn während der Unterbaumsuche ein Timeout auftrat,
+     * darf das Teilergebnis nicht mehr für die Root-Auswahl
+     * oder die TT verwendet werden.
+     */
+      if (_searchTimedOut ||
+          stopwatch.elapsedMilliseconds >= timeLimitMs) {
+        _undoMoveInPlace(
+          state: state,
+          undo: undo,
+        );
 
-      if (!isMateScore) {
-        final int minimaxScore = score;
+        _searchTimedOut = true;
+        completedRootSearch = false;
+        break;
+      }
 
+      /*
+     * Besten reinen Suchwert über alle Root-Züge bestimmen.
+     */
+      if (aiIsWhite) {
+        if (rawSearchScore > bestSearchScore) {
+          bestSearchScore = rawSearchScore;
+        }
+      } else {
+        if (rawSearchScore < bestSearchScore) {
+          bestSearchScore = rawSearchScore;
+        }
+      }
+
+      int adjustedScore = rawSearchScore;
+
+      final bool isMateScore =
+          rawSearchScore.abs() >
+              mateScore - 10000;
+
+      final int positionEvalBeforeMove =
+      evaluator.evaluate(beforeBoard);
+
+      final bool aiWasClearlyBehind = aiIsWhite
+          ? positionEvalBeforeMove <= -150
+          : positionEvalBeforeMove >= 150;
+
+      final bool likelySavingDraw =
+          rawSearchScore == 0 &&
+              aiWasClearlyBehind;
+
+      if (likelySavingDraw) {
+        print(
+          '🤝 Erkanntes Rettungsremis bleibt unverändert | '
+              '${BoardHelper.indexToCoord(move.fromIndex)}'
+              '${BoardHelper.indexToCoord(move.toIndex)} | '
+              'evalVorher=$positionEvalBeforeMove | '
+              'searchScore=$rawSearchScore',
+        );
+      }
+
+      if (!isMateScore && !likelySavingDraw) {
         int seeAdjustment = 0;
         int hangingAdjustment = 0;
         int opponentThreatAdjustment = 0;
         int escapeBonus = 0;
 
+        /*
+       * Bei Captures soll die längere Minimax-Suche entscheiden.
+       * Deshalb nur SEE verwenden und negative SEE-Werte begrenzen.
+       */
         if (isCapture) {
-          final int rawSeeAdjustment = _rootSeeAdjustment(
+          final int rawSeeAdjustment =
+          _rootSeeAdjustment(
             beforeBoard: beforeBoard,
             move: move,
             aiIsWhite: aiIsWhite,
@@ -143,27 +298,36 @@ class MinimaxEngine {
           if (rawSeeAdjustment > 0) {
             seeAdjustment = rawSeeAdjustment;
           } else if (capturedValue >= 500) {
-            seeAdjustment = rawSeeAdjustment.clamp(-100, 0);
+            seeAdjustment =
+                rawSeeAdjustment.clamp(-100, 0);
           } else {
-            seeAdjustment = rawSeeAdjustment.clamp(-600, 0);
+            seeAdjustment =
+                rawSeeAdjustment.clamp(-600, 0);
           }
         } else {
-          hangingAdjustment = _rootHangingPiecesAdjustment(
-            afterState: state,
-            aiIsWhite: aiIsWhite,
-          );
+          /*
+         * Diese Heuristiken werden nur auf ruhige Züge angewendet,
+         * damit mehrzügige Schlagfolgen nicht doppelt bestraft werden.
+         */
+          hangingAdjustment =
+              _rootHangingPiecesAdjustment(
+                afterState: state,
+                aiIsWhite: aiIsWhite,
+              );
 
-          opponentThreatAdjustment = _rootOpponentThreatAdjustment(
-            afterState: state,
-            aiIsWhite: aiIsWhite,
-          );
+          opponentThreatAdjustment =
+              _rootOpponentThreatAdjustment(
+                afterState: state,
+                aiIsWhite: aiIsWhite,
+              );
 
-          escapeBonus = _rootAttackedPieceEscapeBonus(
-            beforeBoard: beforeBoard,
-            afterBoard: state.board,
-            move: move,
-            aiIsWhite: aiIsWhite,
-          );
+          escapeBonus =
+              _rootAttackedPieceEscapeBonus(
+                beforeBoard: beforeBoard,
+                afterBoard: state.board,
+                move: move,
+                aiIsWhite: aiIsWhite,
+              );
         }
 
         final int opponentMateThreatAdjustment =
@@ -172,54 +336,62 @@ class MinimaxEngine {
           aiIsWhite: aiIsWhite,
         );
 
-        final int recaptureBonus = _rootRecaptureBonus(
+        final int recaptureBonus =
+        _rootRecaptureBonus(
           boardBeforeMove: beforeBoard,
           move: move,
           aiIsWhite: aiIsWhite,
         );
 
-        final int undevelopmentPenalty = _rootUndevelopmentPenalty(
-          move: move,
-        );
-
-        final int edgePenalty = _rootMinorPieceEdgePenalty(
-          move: move,
-        );
-
-        final int retreatPenalty = _rootMinorPieceRetreatPenalty(
-          move: move,
-        );
-
-        final int highValueCaptureBonus = _rootHighValueCaptureBonus(
+        final int highValueCaptureBonus =
+        _rootHighValueCaptureBonus(
           boardBeforeMove: beforeBoard,
           move: move,
           aiIsWhite: aiIsWhite,
         );
 
-        score += seeAdjustment;
-        score += hangingAdjustment;
-        score += opponentThreatAdjustment;
-        score += escapeBonus;
-        score += opponentMateThreatAdjustment;
-        score += recaptureBonus;
-        score += undevelopmentPenalty;
-        score += edgePenalty;
-        score += retreatPenalty;
-        score += highValueCaptureBonus;
+        final int undevelopmentPenalty =
+        _rootUndevelopmentPenalty(
+          move: move,
+        );
+
+        final int edgePenalty =
+        _rootMinorPieceEdgePenalty(
+          move: move,
+        );
+
+        final int retreatPenalty =
+        _rootMinorPieceRetreatPenalty(
+          move: move,
+        );
+
+        adjustedScore += seeAdjustment;
+        adjustedScore += hangingAdjustment;
+        adjustedScore += opponentThreatAdjustment;
+        adjustedScore += escapeBonus;
+        adjustedScore += opponentMateThreatAdjustment;
+        adjustedScore += recaptureBonus;
+        adjustedScore += highValueCaptureBonus;
+        adjustedScore += undevelopmentPenalty;
+        adjustedScore += edgePenalty;
+        adjustedScore += retreatPenalty;
 
         _printRootBreakdown(
           move: move,
-          minimaxScore: minimaxScore,
+          minimaxScore: rawSearchScore,
           seeAdjustment: seeAdjustment,
           hangingAdjustment: hangingAdjustment,
-          opponentThreatAdjustment: opponentThreatAdjustment,
+          opponentThreatAdjustment:
+          opponentThreatAdjustment,
           escapeBonus: escapeBonus,
-          opponentMateThreatAdjustment: opponentMateThreatAdjustment,
+          opponentMateThreatAdjustment:
+          opponentMateThreatAdjustment,
           recaptureBonus: recaptureBonus,
-          undevelopmentPenalty: undevelopmentPenalty,
+          undevelopmentPenalty:
+          undevelopmentPenalty,
           edgePenalty: edgePenalty,
           retreatPenalty: retreatPenalty,
-          finalScore: score,
+          finalScore: adjustedScore,
         );
       }
 
@@ -228,64 +400,106 @@ class MinimaxEngine {
         undo: undo,
       );
 
-      if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
-        completedRootSearch = false;
-        break;
-      }
+      /*
+     * Der Root-Zug wird nach adjustedScore ausgewählt.
+     */
+      final bool betterAdjustedMove =
+          bestAdjustedScore == null ||
+              (aiIsWhite
+                  ? adjustedScore > bestAdjustedScore
+                  : adjustedScore < bestAdjustedScore);
 
-      final bool better =
-          bestScore == null ||
-              (aiIsWhite ? score > bestScore : score < bestScore);
-
-      if (better || bestMove == null) {
-        bestScore = score;
+      if (betterAdjustedMove || bestMove == null) {
+        bestAdjustedScore = adjustedScore;
+        bestMoveSearchScore = rawSearchScore;
 
         bestMove = AiMove(
           fromIndex: move.fromIndex,
           toIndex: move.toIndex,
           piece: move.piece,
           promotionPiece: move.promotionPiece,
-          score: score,
+          score: adjustedScore,
         );
       }
     }
 
+    final String printableSearchScore =
+    bestSearchScore == infinity ||
+        bestSearchScore == -infinity
+        ? 'TIMEOUT'
+        : '$bestSearchScore';
+
     print(
-      "🔎 Tiefe $depth | "
-          "Score: ${bestScore ?? "TIMEOUT"} | "
-          "Nodes: $searchedNodes | "
-          "Zeit: ${stopwatch.elapsedMilliseconds} ms",
+      '🔎 Tiefe $depth | '
+          'BestSearchScore: $printableSearchScore | '
+          'MoveSearchScore: '
+          '${bestMoveSearchScore ?? "TIMEOUT"} | '
+          'AdjustedScore: '
+          '${bestAdjustedScore ?? "TIMEOUT"} | '
+          'Nodes: $searchedNodes | '
+          'Zeit: ${stopwatch.elapsedMilliseconds} ms',
     );
 
-    if (!completedRootSearch) {
+    /*
+   * Ein unvollständiges Root-Ergebnis grundsätzlich verwerfen.
+   *
+   * Ausnahme: Ein bereits sicher erkanntes Matt kann behalten werden.
+   */
+    if (!completedRootSearch || _searchTimedOut) {
       final bool bestIsMate =
-          bestScore != null &&
-              bestScore.abs() > mateScore - 10000;
+          bestMoveSearchScore != null &&
+              bestMoveSearchScore.abs() >
+                  mateScore - 10000;
 
-      if (bestIsMate && bestMove != null) {
+      if (bestIsMate &&
+          bestMove != null &&
+          bestAdjustedScore != null) {
         print(
-          "⏱️ Tiefe $depth unvollständig, aber Matt gefunden -> wird behalten",
+          '⏱️ Tiefe $depth unvollständig, '
+              'aber Matt gefunden -> wird behalten',
         );
 
-        return bestMove;
+        return RootSearchResult(
+          move: bestMove,
+          moveSearchScore: bestMoveSearchScore,
+          bestSearchScore: bestSearchScore,
+          adjustedScore: bestAdjustedScore,
+        );
       }
 
-      print("⏱️ Tiefe $depth unvollständig -> Ergebnis wird verworfen");
+      print(
+        '⏱️ Tiefe $depth unvollständig '
+            '-> Ergebnis wird verworfen',
+      );
+
       return null;
     }
 
-    if (bestMove != null) {
-      final String pv = getPrincipalVariationFromMove(
-        state,
-        bestMove,
-        depth,
-      );
-
-      print("📌 PV Tiefe $depth: $pv");
+    if (bestMove == null ||
+        bestMoveSearchScore == null ||
+        bestAdjustedScore == null) {
+      return null;
     }
 
-    return bestMove;
+    final String pv =
+    getPrincipalVariationFromMove(
+      state,
+      bestMove,
+      depth,
+    );
+
+    print('📌 PV Tiefe $depth: $pv');
+
+    return RootSearchResult(
+      move: bestMove,
+      moveSearchScore: bestMoveSearchScore,
+      bestSearchScore: bestSearchScore,
+      adjustedScore: bestAdjustedScore,
+    );
   }
+
+
+
 
   int minimaxTimed({
     required AiGameState state,
@@ -296,7 +510,9 @@ class MinimaxEngine {
     required Stopwatch stopwatch,
     required int timeLimitMs,
   }) {
+
     if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
+      _searchTimedOut = true;
       return evaluator.evaluate(state.board);
     }
 
@@ -316,26 +532,29 @@ class MinimaxEngine {
     int localAlpha = alpha;
     int localBeta = beta;
 
+
     final TranspositionEntry? entry = transpositionTable.get(key);
 
-    final bool canUseEntry =
-        entry != null &&
-            entry.depth >= depth &&
-            entry.score.abs() <= mateScore - 10000;
+    final bool canUseEntryScore = entry != null && entry.depth >= depth;
 
-    if (canUseEntry) {
+    if (canUseEntryScore) {
+      final int ttScore = _scoreFromTt(
+        entry.score,
+        ply,
+      );
+
       if (entry.flag == TranspositionFlag.exact) {
-        return entry.score;
+        return ttScore;
       }
 
       if (entry.flag == TranspositionFlag.lowerBound) {
-        localAlpha = max(localAlpha, entry.score);
+        localAlpha = max(localAlpha, ttScore);
       } else if (entry.flag == TranspositionFlag.upperBound) {
-        localBeta = min(localBeta, entry.score);
+        localBeta = min(localBeta, ttScore);
       }
 
       if (localAlpha >= localBeta) {
-        return entry.score;
+        return ttScore;
       }
     }
 
@@ -416,12 +635,18 @@ class MinimaxEngine {
 
     final List<AiMove> moves = _getOrderedMoves(
       state: state,
-      hashEntry: canUseEntry ? entry : null,
+      hashEntry: entry,
       ply: ply,
     );
 
     if (moves.isEmpty) {
-      return evaluator.evaluate(state.board);
+      if (inCheck) {
+        return state.isWhiteTurn
+            ? -mateScore + ply
+            : mateScore - ply;
+      }
+
+      return 0;
     }
 
     AiMove? bestMove;
@@ -433,6 +658,7 @@ class MinimaxEngine {
         final AiMove move = moves[moveIndex];
 
         if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
+          _searchTimedOut = true;
           break;
         }
 
@@ -540,14 +766,17 @@ class MinimaxEngine {
         }
       }
 
-      _storeTransposition(
-        key: key,
-        depth: depth,
-        score: bestScore,
-        originalAlpha: originalAlpha,
-        originalBeta: originalBeta,
-        bestMove: bestMove,
-      );
+      if (!_searchTimedOut && bestMove != null) {
+        _storeTransposition(
+          key: key,
+          depth: depth,
+          score: bestScore,
+          originalAlpha: originalAlpha,
+          originalBeta: originalBeta,
+          bestMove: bestMove,
+          ply: ply,
+        );
+      }
 
       return bestScore;
     } else {
@@ -557,6 +786,7 @@ class MinimaxEngine {
         final AiMove move = moves[moveIndex];
 
         if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
+          _searchTimedOut = true;
           break;
         }
 
@@ -664,14 +894,17 @@ class MinimaxEngine {
         }
       }
 
-      _storeTransposition(
-        key: key,
-        depth: depth,
-        score: bestScore,
-        originalAlpha: originalAlpha,
-        originalBeta: originalBeta,
-        bestMove: bestMove,
-      );
+      if (!_searchTimedOut && bestMove != null) {
+        _storeTransposition(
+          key: key,
+          depth: depth,
+          score: bestScore,
+          originalAlpha: originalAlpha,
+          originalBeta: originalBeta,
+          bestMove: bestMove,
+          ply: ply,
+        );
+      }
 
       return bestScore;
     }
@@ -946,23 +1179,33 @@ class MinimaxEngine {
     required int originalAlpha,
     required int originalBeta,
     required AiMove? bestMove,
+    required int ply,
   }) {
-    TranspositionFlag flag = TranspositionFlag.exact;
+    if (bestMove == null) {
+      return;
+    }
+
+    TranspositionFlag flag;
 
     if (score <= originalAlpha) {
       flag = TranspositionFlag.upperBound;
     } else if (score >= originalBeta) {
       flag = TranspositionFlag.lowerBound;
+    } else {
+      flag = TranspositionFlag.exact;
     }
 
     transpositionTable.put(
       key: key,
       depth: depth,
-      score: score,
+      score: _scoreToTt(
+        score,
+        ply,
+      ),
       flag: flag,
-      bestFrom: bestMove?.fromIndex,
-      bestTo: bestMove?.toIndex,
-      bestPromotion: bestMove?.promotionPiece,
+      bestFrom: bestMove.fromIndex,
+      bestTo: bestMove.toIndex,
+      bestPromotion: bestMove.promotionPiece,
     );
   }
 
@@ -1709,6 +1952,37 @@ class MinimaxEngine {
       return staticEval - margin >= beta;
     }
   }
+
+  int _scoreToTt(
+      int score,
+      int ply,
+      ) {
+    if (score > mateScore - 10000) {
+      return score + ply;
+    }
+
+    if (score < -mateScore + 10000) {
+      return score - ply;
+    }
+
+    return score;
+  }
+
+  int _scoreFromTt(
+      int score,
+      int ply,
+      ) {
+    if (score > mateScore - 10000) {
+      return score - ply;
+    }
+
+    if (score < -mateScore + 10000) {
+      return score + ply;
+    }
+
+    return score;
+  }
+
 
   int perft({
     required AiGameState state,

@@ -926,21 +926,23 @@ class TestPositions {
   static AiGameState badExchangeLosesMaterial() {
     final board = List<int>.filled(64, 0);
 
-    board[BoardHelper.getIndex(7, 6)] = 6;   // Weiß Kg1
-    board[BoardHelper.getIndex(0, 6)] = -6;  // Schwarz Kg8
+    final mapper = BoardCoordinateMapper(
+      figurenfarbe: true,
+    );
 
-    board[BoardHelper.getIndex(4, 3)] = 3;    // Weiß Läufer d4
-    board[BoardHelper.getIndex(3, 4)] = -2;   // Schwarz Springer e5
+    void put(int row, int col, int piece) {
+      board[mapper.guiToAiIndex(row, col)] = piece;
+    }
 
-    board[BoardHelper.getIndex(2, 5)] = -4;   // Schwarz Turm f6
-    board[BoardHelper.getIndex(1, 4)] = -5;   // Schwarz Dame e7 unterstützt e5/f6
-
-    board[BoardHelper.getIndex(5, 2)] = 5;    // Weiß Dame c3
-    board[BoardHelper.getIndex(6, 0)] = 1;
-    board[BoardHelper.getIndex(1, 0)] = -1;
-
-    // Weiß kann Bxe5 spielen, aber nach weiterer Schlagfolge
-    // sollte der Abtausch ungünstig sein.
+    put(0, 6, -6); // Schwarz KOENIG
+    put(1, 0, -1); // Schwarz BAUER
+    put(1, 4, -5); // Schwarz DAME
+    put(2, 5, -4); // Schwarz TURM
+    put(3, 4, -2); // Schwarz SPRINGER
+    put(4, 3, 3); // Weiß LAEUFER
+    put(5, 2, 5); // Weiß DAME
+    put(6, 0, 1); // Weiß BAUER
+    put(7, 6, 6); // Weiß KOENIG
 
     return AiGameState(
       board: board,
@@ -1114,6 +1116,75 @@ class TestPositions {
       castlingRights: noCastling(),
     );
   }
+
+  static AiGameState patt() {
+    final board = List<int>.filled(64, 0);
+
+    final mapper = BoardCoordinateMapper(
+      figurenfarbe: false,
+    );
+
+    void put(int row, int col, int piece) {
+      board[mapper.guiToAiIndex(row, col)] = piece;
+    }
+
+    put(2, 1, 6); // Weiß KOENIG
+    put(2, 2, 1); // Weiß BAUER
+    put(3, 0, 1); // Weiß BAUER
+    put(3, 2, 5); // Weiß DAME
+    put(4, 0, -1); // Schwarz BAUER
+    put(6, 5, -5); // Schwarz DAME
+    put(7, 6, -6); // Schwarz KOENIG
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: false,
+      isEnemyMove: false,
+      playerIsWhite: false,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
+  static AiGameState schlagfolge() {
+    final board = List<int>.filled(64, 0);
+
+    final mapper = BoardCoordinateMapper(
+      figurenfarbe: true,
+    );
+
+    void put(int row, int col, int piece) {
+      board[mapper.guiToAiIndex(row, col)] = piece;
+    }
+
+    put(0, 2, -6); // Schwarz KOENIG
+    put(1, 0, -1); // Schwarz BAUER
+    put(1, 1, -1); // Schwarz BAUER
+    put(2, 4, -5); // Schwarz DAME
+    put(3, 3, -1); // Schwarz BAUER
+    put(4, 1, 1); // Weiß BAUER
+    put(4, 2, 1); // Weiß BAUER
+    put(4, 3, 1); // Weiß BAUER
+    put(4, 4, -2); // Schwarz SPRINGER
+    put(5, 3, 5); // Weiß DAME
+    put(5, 6, -4); // Schwarz TURM
+    put(6, 0, 1); // Weiß BAUER
+    put(6, 6, 1); // Weiß BAUER
+    put(7, 4, 4); // Weiß TURM
+    put(7, 6, 6); // Weiß KOENIG
+
+    return AiGameState(
+      board: board,
+      isWhiteTurn: true,
+      isEnemyMove: false,
+      playerIsWhite: true,
+      enPassantTargetIndex: null,
+      castlingRights: noCastling(),
+    );
+  }
+
+
 
 
 

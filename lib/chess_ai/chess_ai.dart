@@ -24,6 +24,7 @@ class ChessAi {
     transpositionTable: transpositionTable,
   );
 
+
   AiMove? getBestMove({
     required AiGameState state,
     required List<String> moveHistory,
@@ -33,23 +34,7 @@ class ChessAi {
   }) {
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     print("🤖 KI-Berechnung gestartet");
-
-/*  print("State: ${state.debugString}");
-    print("MoveHistory Strings: ${moveHistory.length}");
-    print("HistoryKeys: ${state.positionHistory.length}");
-    print("HalfmoveClock: ${state.halfmoveClock}");
-    print("CurrentKey: ${state.zobristKey}");
-    print("TT vor Clear: ${transpositionTable.size}");*/
-
-/*    print("TT vor Clear: ${transpositionTable.size}");
-
-    //transpositionTable.clear();
-
-    print("TT nach Clear: ${transpositionTable.size}");*/
-
     print("TT: ${transpositionTable.size}");
-
-
 
     final AiMove? bookMove = openingBookService.findBookMove(
       state: state,
@@ -79,122 +64,223 @@ class ChessAi {
 
     AiMove? bestMove;
 
-    final int maxDepth = calculateMaxDepth(state.board);
+    /*
+   * Roher Minimax-Wert des aktuell gespeicherten bestMove.
+   *
+   * Dieser Wert ist wichtig, damit Matt und Remis immer
+   * zum tatsächlich gespeicherten Zug gehören.
+   */
+    int? bestMoveSearchScore;
+
+    final int maxDepth = calculateMaxDepth(
+      state.board,
+    );
 
     print("MaxDepth: $maxDepth");
 
-    int previousScore = 0;
+    /*
+   * TT normalerweise nicht zwischen den Tiefen leeren.
+   * Nur für spezielle Diagnosezwecke auf true setzen.
+   */
+    const bool clearTtBeforeEveryDepth = false;
+
+    /*
+   * Bewertung aus Sicht von Weiß:
+   *
+   * positiv = Weiß steht besser
+   * negativ = Schwarz steht besser
+   */
+    final int rootPositionEval =
+    evaluator.evaluate(state.board);
+
+    final bool aiClearlyBehind =
+    state.isWhiteTurn
+        ? rootPositionEval <= -150
+        : rootPositionEval >= 150;
 
     for (int depth = 1; depth <= maxDepth; depth++) {
       if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
         break;
       }
 
-      int window = depth <= 3 ? MinimaxEngine.infinity : 150;
-
-      AiMove? move;
-
-      while (true) {
-        final int alpha = previousScore - window;
-        final int beta = previousScore + window;
-
-        move = minimaxEngine.findBestMoveTimed(
-          state: state,
-          depth: depth,
-          stopwatch: stopwatch,
-          timeLimitMs: timeLimitMs,
-          alpha: alpha,
-          beta: beta,
-        );
-
-        if (move == null) {
-          break;
-        }
-
-        final bool isMateScore =
-            move.score.abs() > MinimaxEngine.mateScore - 10000;
-
-        if (isMateScore) {
-          break;
-        }
-
-        if (stopwatch.elapsedMilliseconds >= timeLimitMs) {
-          break;
-        }
-
-        final bool failLow = move.score <= alpha;
-        final bool failHigh = move.score >= beta;
-
-        if (!failLow && !failHigh) {
-          break;
-        }
-
-        window *= 2;
-
-        if (window >= MinimaxEngine.infinity ~/ 2) {
-          break;
-        }
-
+      if (clearTtBeforeEveryDepth) {
         print(
-          "🔁 Aspiration Retry Tiefe $depth | "
-              "Score: ${move.score} | "
-              "Neues Fenster: ±$window",
+          "🧹 TT vor Tiefe $depth leeren | "
+              "Einträge: ${transpositionTable.size}",
         );
+
+        transpositionTable.clear();
       }
 
-      if (move == null) {
+      /*
+     * Vollständiges Alpha-Beta-Fenster.
+     *
+     * Aspiration bleibt vorerst deaktiviert, weil die starken
+     * nachträglichen Root-Heuristiken mit engen Bounds keine
+     * zuverlässige Root-Zugauswahl erlauben.
+     */
+      final RootSearchResult? result =
+      minimaxEngine.findBestMoveTimedResult(
+        state: state,
+        depth: depth,
+        stopwatch: stopwatch,
+        timeLimitMs: timeLimitMs,
+        alpha: -MinimaxEngine.infinity,
+        beta: MinimaxEngine.infinity,
+      );
+
+      /*
+     * Die aktuelle Tiefe wurde nicht vollständig abgeschlossen.
+     * Der Zug aus der letzten vollständig beendeten Tiefe bleibt.
+     */
+      if (result == null) {
+        print(
+          "⏱️ Tiefe $depth nicht vollständig abgeschlossen "
+              "-> letzter vollständiger Zug bleibt erhalten",
+        );
+
         break;
       }
 
+      final AiMove resultMove = result.move;
+
+      /*
+     * Der von der Root-Suche ausgewählte Zug wird mit seinem
+     * adjustedScore gespeichert.
+     */
+      final AiMove adjustedMove = AiMove(
+        fromIndex: resultMove.fromIndex,
+        toIndex: resultMove.toIndex,
+        piece: resultMove.piece,
+        promotionPiece: resultMove.promotionPiece,
+        score: result.adjustedScore,
+      );
+
       final bool oldIsImportantCapture =
-          bestMove != null && _isImportantCapture(state, bestMove);
+          bestMove != null &&
+              _isImportantCapture(
+                state,
+                bestMove,
+              );
 
       final bool newIsImportantCapture =
-      _isImportantCapture(state, move);
+      _isImportantCapture(
+        state,
+        adjustedMove,
+      );
 
-      if (
-      bestMove != null &&
-          oldIsImportantCapture &&
-          !newIsImportantCapture &&
-          move.score < bestMove.score + 250
-      ) {
+      /*
+     * Die Capture-Stabilisierung gehört zur Root-Zugauswahl.
+     * Deshalb werden hier die adjustedScores verglichen.
+     */
+      final bool newMoveClearlyBetter =
+          bestMove == null ||
+              (state.isWhiteTurn
+                  ? result.adjustedScore >=
+                  bestMove.score + 250
+                  : result.adjustedScore <=
+                  bestMove.score - 250);
+
+      /*
+     * Rettungsremis immer anhand des rohen Minimax-Werts
+     * des tatsächlich ausgewählten Zuges erkennen.
+     */
+      final bool newMoveIsSavingDraw =
+          aiClearlyBehind &&
+              result.moveSearchScore == 0;
+
+      final bool keepOldImportantCapture =
+          bestMove != null &&
+              oldIsImportantCapture &&
+              !newIsImportantCapture &&
+              !newMoveClearlyBetter &&
+              !newMoveIsSavingDraw;
+
+      if (keepOldImportantCapture) {
         print(
           "🛡️ Wichtiger Capture bleibt erhalten | "
               "Alt: ${bestMove.fromIndex}->${bestMove.toIndex} "
-              "Score=${bestMove.score} | "
-              "Neu: ${move.fromIndex}->${move.toIndex} "
-              "Score=${move.score}",
+              "Adjusted=${bestMove.score} | "
+              "Neu: ${adjustedMove.fromIndex}->"
+              "${adjustedMove.toIndex} "
+              "MoveSearch=${result.moveSearchScore} | "
+              "BestSearch=${result.bestSearchScore} | "
+              "Adjusted=${result.adjustedScore}",
         );
+
+        /*
+       * bestMove und bestMoveSearchScore gehören zusammen.
+       * Deshalb darf der Suchwert des verworfenen neuen Zuges
+       * hier nicht übernommen werden.
+       */
       } else {
-        bestMove = move;
-        previousScore = move.score;
+        if (newMoveIsSavingDraw) {
+          print(
+            "🤝 Rettungsremis übernimmt bisherigen Zug | "
+                "${adjustedMove.fromIndex}->"
+                "${adjustedMove.toIndex} | "
+                "MoveSearchScore=${result.moveSearchScore}",
+          );
+        }
+
+        bestMove = adjustedMove;
+        bestMoveSearchScore = result.moveSearchScore;
       }
 
       print(
         "✅ Iterative Deepening Tiefe $depth fertig | "
-            "Move: ${move.fromIndex} -> ${move.toIndex} | "
-            "Score: ${move.score} | "
+            "Move: ${adjustedMove.fromIndex} -> "
+            "${adjustedMove.toIndex} | "
+            "MoveSearchScore: ${result.moveSearchScore} | "
+            "BestSearchScore: ${result.bestSearchScore} | "
+            "AdjustedScore: ${result.adjustedScore} | "
+            "Gespeichert: "
+            "${bestMove?.fromIndex} -> "
+            "${bestMove?.toIndex} | "
+            "Gespeicherter SearchScore: "
+            "${bestMoveSearchScore ?? 'unbekannt'} | "
             "Zeit: ${stopwatch.elapsedMilliseconds} ms",
       );
 
-      if (move.score.abs() > MinimaxEngine.mateScore - 10000) {
-        final bool winningMate =
-            (state.isWhiteTurn && move.score > 0) ||
-                (!state.isWhiteTurn && move.score < 0);
+      /*
+     * Nur wegen des aktuell untersuchten Zuges abbrechen,
+     * wenn dieser Zug auch tatsächlich als bestMove übernommen
+     * wurde. Ein Mattzug darf nicht zum Abbruch führen, wenn die
+     * Capture-Stabilisierung stattdessen den alten Zug behält.
+     */
+      final bool currentMoveWasStored =
+          bestMove != null &&
+              bestMove.fromIndex == adjustedMove.fromIndex &&
+              bestMove.toIndex == adjustedMove.toIndex &&
+              bestMove.promotionPiece ==
+                  adjustedMove.promotionPiece;
 
-        final int mateDistance = MinimaxEngine.mateScore - move.score.abs();
+      final bool currentMoveIsMate =
+          result.moveSearchScore.abs() >
+              MinimaxEngine.mateScore - 10000;
+
+      if (currentMoveWasStored && currentMoveIsMate) {
+        final bool winningMate =
+            (state.isWhiteTurn &&
+                result.moveSearchScore > 0) ||
+                (!state.isWhiteTurn &&
+                    result.moveSearchScore < 0);
+
+        final int mateDistance =
+            MinimaxEngine.mateScore -
+                result.moveSearchScore.abs();
 
         if (winningMate) {
           print(
             "🏁 Gewinnende Mattlinie erkannt | "
-                "Score: ${move.score} | "
+                "MoveSearchScore: ${result.moveSearchScore} | "
                 "Distanzwert: $mateDistance | "
                 "Suche bis Tiefe $depth",
           );
         } else {
           print(
             "⚠️ Verlorene erzwungene Mattlinie erkannt | "
-                "Score: ${move.score} | "
+                "MoveSearchScore: ${result.moveSearchScore} | "
                 "Distanzwert: $mateDistance | "
                 "Suche bis Tiefe $depth",
           );
@@ -214,8 +300,12 @@ class ChessAi {
 
     if (bestMove != null) {
       print(
-        "Bester Zug: ${bestMove.fromIndex} -> ${bestMove.toIndex} | "
-            "Score: ${bestMove.score}",
+        "Bester Zug: "
+            "${bestMove.fromIndex} -> "
+            "${bestMove.toIndex} | "
+            "AdjustedScore: ${bestMove.score} | "
+            "MoveSearchScore: "
+            "${bestMoveSearchScore ?? 'unbekannt'}",
       );
     }
 
